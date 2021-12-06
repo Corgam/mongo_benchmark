@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 from multiprocessing import Process
-import time, os, toml
+import time, os, toml, shutil
 from datetime import datetime
 
 CONFIG_PATH = "./config.toml"
@@ -8,6 +8,7 @@ CONFIG_PATH = "./config.toml"
 # Global variables
 dirName : str = None
 procs = []
+finalNumberOfProcesses = 0
 
 def initLogging(config):
     print("Starting logging..")
@@ -23,6 +24,7 @@ def initLogging(config):
     header.write("Number of MongoDB shards, "+ str(config["number_of_mongo_shards"]) +"\n")
     header.write("Time of benchmark, "+ timeStr+"\n")
     header.write("HEADER, End\n")
+    header.write("date,time,phase,processName,action\n")
     header.close()
     return 1
     
@@ -30,9 +32,9 @@ def initLogging(config):
 def preLoad():
     print("Preloading...")
     preload = open(dirName+"/preload.txt", "a")
-    preload.write(f"{getCurrentTime()}, Preload, Started\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,Started\n")
     client = MongoClient('mongodb://imongo:27017')
-    preload.write(f"{getCurrentTime()}, Preload, Finished\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,Finished\n")
     preload.close()
     return 1
 
@@ -43,7 +45,7 @@ def warmUp():
 
 def startBenchmark(config):
     print("Starting benchmark...")
-    global procs, dirName
+    global procs, dirName, finalNumberOfProcesses
     # Creating new processes
     for id in range(3):
         proc = Process(target=startWorker, args=(id, dirName, ))
@@ -56,6 +58,7 @@ def startBenchmark(config):
     #collection.insert_one(document)
 
     # Join all proceses
+    finalNumberOfProcesses = len(procs)
     for proc in procs:
         proc.kill()
     print("Benchmark has ended...")
@@ -68,20 +71,35 @@ def startWorker(id : int, dirName: str):
     """
     # TODO: Rework the file opening and closing
     file = open(dirName+f"/worker{id}.txt", "a")
-    file.write(f"{getCurrentTime()}, Benchmark, Process{id}, Created\n")
+    file.write(f"{getCurrentTime()},Benchmark,Process{id},Created\n")
     file.close()
     # Connect to the database
     #client = MongoClient('mongodb://imongo:27017')
     # Start sending the queries
     while True:
         file = open(dirName+f"/worker{id}.txt", "a")
-        file.write(f"{getCurrentTime()}, Benchmark, Process{id}, Sending the query\n")
+        file.write(f"{getCurrentTime()},Benchmark,Process{id},SendingQuery\n")
         file.close()
         time.sleep(1)
     # Close the file
 
 def cleanUp():
     print("Cleaning up...")
+    # Prepare the list of files
+    # TODO: When copying sort by the time
+    fileNames = [dirName+"/header.txt", dirName+"/preload.txt"]
+    for i in range(finalNumberOfProcesses):
+        fileNames.append(dirName+f"/worker{i}.txt")
+    # Create the final result file
+    with open(dirName+".txt", "wb") as finalFile:
+        for f in fileNames:
+            with open(f, 'rb') as fd:
+                shutil.copyfileobj(fd,finalFile)
+    # Delete the temp folder
+    try:
+        shutil.rmtree(dirName)
+    except OSError as e:
+        print("Error: %s - %s." % (e.filename, e.strerror))
     # Close the file
     return 1
 

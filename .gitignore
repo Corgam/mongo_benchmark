@@ -1,5 +1,10 @@
 # Additional
 Benchmark*
+deployments/*/mongokey
+deployments/*/terraform*
+deployments/*/.terraform*
+client/*/terraform*
+client/*/.terraform*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

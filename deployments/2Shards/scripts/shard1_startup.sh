@@ -16,10 +16,10 @@ done;
 # Copy all necessary files to the container
 sudo mkdir customdata
 sudo mkdir logging
-sudo docker cp /tmp/configserver.conf mongodb:/configserver.conf
+sudo docker cp /tmp/shard1.conf mongodb:/shard1.conf
 sudo docker cp /tmp/initiate.js mongodb:/initiate.js
 sudo docker cp ./customdata mongodb:/customdata
 sudo docker cp ./logging mongodb:/logging
-# Run the config server
-sudo docker exec mongodb /bin/sh -c "mongod --config configserver.conf --fork --logpath /logging/configserver.log"
-sudo docker exec mongodb /bin/sh -c "mongosh --norc localhost:27019 ./initiate.js"
+# # Run the config server
+sudo docker exec mongodb /bin/sh -c "mongod --config shard1.conf --fork --logpath /logging/shard1.log"
+sudo docker exec mongodb /bin/sh -c "mongosh --norc localhost:27018 ./initiate.js"

@@ -14,7 +14,7 @@ provider "google" {
 }
 
 # Config Server for the MongoDB
-resource "google_compute_instance" "mongodb" {
+resource "google_compute_instance" "configserver" {
   name = "configserver"
   machine_type = "e2-standard-2"
   allow_stopping_for_update = true
@@ -29,15 +29,13 @@ resource "google_compute_instance" "mongodb" {
     network = "default"
     access_config {}
   }
-  # Run the mongo container from uploaded image
-  metadata_startup_script = "sudo docker run --name mongodb -p 27017:27017 -d mongo:5.0.4"
   # Upload the ssh public key
   metadata = {
     ssh-keys = "ubuntu:${file("./mongokey.pub")}"
   }
   # Upload the config file for the configserver mongo
   provisioner "file" {
-    source = "configserver.conf"
+    source = "mongo_configs/configserver.conf"
     destination = "/tmp/configserver.conf"
     connection {
       type = "ssh"
@@ -48,8 +46,8 @@ resource "google_compute_instance" "mongodb" {
   }
   # Upload the js file for init
   provisioner "file" {
-    source = "init.js"
-    destination = "/tmp/init.js"
+    source = "scripts/initiate.js"
+    destination = "/tmp/initiate.js"
     connection {
       type = "ssh"
       user = "ubuntu"
@@ -57,20 +55,63 @@ resource "google_compute_instance" "mongodb" {
       private_key = file("./mongokey")
     } 
   }
-  # Upload the script for the init
-  # provisioner "file" {
-  #   source = "scripts/mongo_startup.sh"
-  #   destination = "/tmp/mongo_startup.sh"
-  #   connection {
-  #     type = "ssh"
-  #     user = "ubuntu"
-  #     host = self.network_interface[0].access_config[0].nat_ip
-  #     private_key = file("./mongokey")
-  #   } 
-  # }
   # Start the script for 
   provisioner "remote-exec" {
     script = "scripts/config_server_startup.sh"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+}
+
+# Shard 1 for the MongoDB
+resource "google_compute_instance" "shard1" {
+  name = "shard1"
+  machine_type = "e2-standard-2"
+  allow_stopping_for_update = true
+  # Specify the image as: container optimized OS
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+    }
+   }
+  
+  network_interface {
+    network = "default"
+    access_config {}
+  }
+  # Upload the ssh public key
+  metadata = {
+    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+  }
+  # Upload the config file for the configserver mongo
+  provisioner "file" {
+    source = "mongo_configs/shard1.conf"
+    destination = "/tmp/shard1.conf"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Upload the js file for init
+  provisioner "file" {
+    source = "scripts/initiate.js"
+    destination = "/tmp/initiate.js"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Start the script for 
+  provisioner "remote-exec" {
+    script = "scripts/shard1_startup.sh"
     connection {
       type = "ssh"
       user = "ubuntu"

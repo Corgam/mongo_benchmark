@@ -120,3 +120,111 @@ resource "google_compute_instance" "shard1" {
     } 
   }
 }
+
+# Shard 2 for the MongoDB
+resource "google_compute_instance" "shard2" {
+  name = "shard2"
+  machine_type = "e2-standard-2"
+  allow_stopping_for_update = true
+  # Specify the image as: container optimized OS
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+    }
+   }
+  
+  network_interface {
+    network = "default"
+    access_config {}
+  }
+  # Upload the ssh public key
+  metadata = {
+    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+  }
+  # Upload the config file for the configserver mongo
+  provisioner "file" {
+    source = "mongo_configs/shard2.conf"
+    destination = "/tmp/shard2.conf"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Upload the js file for init
+  provisioner "file" {
+    source = "scripts/initiate.js"
+    destination = "/tmp/initiate.js"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Start the script for 
+  provisioner "remote-exec" {
+    script = "scripts/shard2_startup.sh"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+}
+
+# Mongos router
+resource "google_compute_instance" "mongos" {
+  name = "mongos"
+  machine_type = "e2-standard-2"
+  allow_stopping_for_update = true
+  # Specify the image as: container optimized OS
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+    }
+   }
+  
+  network_interface {
+    network = "default"
+    access_config {}
+  }
+  # Upload the ssh public key
+  metadata = {
+    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+  }
+  # Upload the config file for the configserver mongo
+  provisioner "file" {
+    source = "mongo_configs/mongos.conf"
+    destination = "/tmp/mongos.conf"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Upload the js file for init
+  provisioner "file" {
+    source = "scripts/initiate.js"
+    destination = "/tmp/initiate.js"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Start the script for 
+  provisioner "remote-exec" {
+    script = "scripts/mongos.sh"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+}

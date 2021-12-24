@@ -72,7 +72,7 @@ resource "google_compute_instance" "shard1" {
   name = "shard1"
   machine_type = "e2-standard-2"
   allow_stopping_for_update = true
-  # Specify the OS image
+  # Specify the image as: container optimized OS
   boot_disk {
     initialize_params {
       image = "ubuntu-os-cloud/ubuntu-minimal-2004-focal-v20211209"
@@ -81,6 +81,7 @@ resource "google_compute_instance" "shard1" {
   
   network_interface {
     network = "default"
+    #network_ip = "10.132.0.51"
     access_config {}
   }
   # Upload the ssh public key
@@ -166,6 +167,60 @@ resource "google_compute_instance" "shard2" {
   # Start the script for 
   provisioner "remote-exec" {
     script = "scripts/shard2_startup.sh"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+}
+
+# Shard 3 for the MongoDB
+resource "google_compute_instance" "shard3" {
+  name = "shard3"
+  machine_type = "e2-standard-2"
+  allow_stopping_for_update = true
+  # Specify the image as: container optimized OS
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-minimal-2004-focal-v20211209"
+    }
+   }
+  
+  network_interface {
+    network = "default"
+    access_config {}
+  }
+  # Upload the ssh public key
+  metadata = {
+    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+  }
+  # Upload the config file for the configserver mongo
+  provisioner "file" {
+    source = "mongo_configs/shard3.conf"
+    destination = "/tmp/shard3.conf"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Upload the js file for init
+  provisioner "file" {
+    source = "scripts/initiate.js"
+    destination = "/tmp/initiate.js"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
+  # Start the script for 
+  provisioner "remote-exec" {
+    script = "scripts/shard3_startup.sh"
     connection {
       type = "ssh"
       user = "ubuntu"

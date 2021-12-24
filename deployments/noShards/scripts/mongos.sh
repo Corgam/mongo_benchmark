@@ -7,3 +7,5 @@ sudo apt --assume-yes install mongodb-org
 # Make necessary directories
 sudo mkdir /tmp/database
 sudo mkdir /tmp/logging
+# Start the database
+sudo mongod --config /tmp/mongos.conf --fork --logpath /tmp/logging/mongos.log

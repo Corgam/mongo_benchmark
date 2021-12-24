@@ -33,9 +33,20 @@ resource "google_compute_instance" "mongos" {
   metadata = {
     ssh-keys = "ubuntu:${file("./mongokey.pub")}"
   }
+  # Upload the config file for the configserver mongo
+  provisioner "file" {
+    source = "mongo_configs/mongos.conf"
+    destination = "/tmp/mongos.conf"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./mongokey")
+    } 
+  }
   # Start the script for 
   provisioner "remote-exec" {
-    script = "scripts/mongosh.sh"
+    script = "scripts/mongos.sh"
     connection {
       type = "ssh"
       user = "ubuntu"

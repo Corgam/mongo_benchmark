@@ -24,7 +24,7 @@ def initLogging(config):
     header.write("Number of MongoDB shards, "+ str(config["number_of_mongo_shards"]) +"\n")
     header.write("Time of benchmark, "+ timeStr+"\n")
     header.write("HEADER, End\n")
-    header.write("date,time,phase,processName,action\n")
+    header.write("date,time,phase,processName,action,queryID,ifAcknowledged,insertedID\n")
     header.close()
     return 1
     
@@ -33,7 +33,7 @@ def preLoad():
     print("Preloading...")
     preload = open(dirName+"/preload.txt", "a")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,Started\n")
-    client = MongoClient('mongodb://imongo:27017')
+    #client = MongoClient('mongodb://mongos:27019')
     preload.write(f"{getCurrentTime()},Preload,MainProcess,Finished\n")
     preload.close()
     return 1
@@ -52,12 +52,8 @@ def startBenchmark(config):
         procs.append(proc)
         proc.start()
         time.sleep(config["new_process_interval"])
-    #db = client["ini"]
-    #collection = db['col']
-    #document = {"name": "Corgam", "source": "stackoverflow", "question": 70157757}
-    #collection.insert_one(document)
-
     # Join all proceses
+    time.sleep(60)
     finalNumberOfProcesses = len(procs)
     for proc in procs:
         proc.kill()
@@ -74,12 +70,24 @@ def startWorker(id : int, dirName: str):
     file.write(f"{getCurrentTime()},Benchmark,Process{id},Created\n")
     file.close()
     # Connect to the database
-    #client = MongoClient('mongodb://imongo:27017')
+    client = MongoClient("mongodb://mongos:27017")
+    db = client["testDatabase"]
+    collection = db["testCollection"]
     # Start sending the queries
+    i = 0
     while True:
+        # Sending the query
         file = open(dirName+f"/worker{id}.txt", "a")
-        file.write(f"{getCurrentTime()},Benchmark,Process{id},SendingQuery\n")
+        file.write(f"{getCurrentTime()},Benchmark,Process{id},SendingQuery,{i}\n")
         file.close()
+        print(f"Process{id}: Sending query{i}...")
+        document = {"processID": id, "queryID" : i, "name": "Corgam"}
+        response = collection.insert_one(document)
+        # Receiving the response
+        file = open(dirName+f"/worker{id}.txt", "a")
+        file.write(f"{getCurrentTime()},Benchmark,Process{id},ReceivedResponse,{i},{response.acknowledged},{response.inserted_id}\n")
+        file.close()
+        i += 1
         time.sleep(1)
     # Close the file
 
@@ -109,7 +117,7 @@ def getCurrentTime():
 
 if __name__ == '__main__':
     # Open the config
-    with open("./config.toml") as f:
+    with open(CONFIG_PATH) as f:
         config = toml.load(f)
     # Init the logging
     if (initLogging(config) != 1):

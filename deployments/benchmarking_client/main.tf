@@ -28,6 +28,10 @@ resource "google_compute_instance" "benchmarking_client" {
     network = "default"
     access_config {}
   }
+  # Upload the ssh public key
+  metadata = {
+    ssh-keys = "ubuntu:${file("./client.pub")}"
+  }
   # Upload the config file
   provisioner "file" {
     source = "../../config.toml"
@@ -54,6 +58,16 @@ resource "google_compute_instance" "benchmarking_client" {
   provisioner "file" {
     source = "src/client.py"
     destination = "/tmp/client.py"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./clientkey")
+    } 
+  }
+  # Start the python script
+  provisioner "remote-exec" {
+    script = "scripts/client.sh"
     connection {
       type = "ssh"
       user = "ubuntu"

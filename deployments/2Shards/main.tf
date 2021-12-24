@@ -27,6 +27,7 @@ resource "google_compute_instance" "configserver" {
   
   network_interface {
     network = "default"
+    #network_ip = "10.132.0.41"
     access_config {}
   }
   # Upload the ssh public key
@@ -81,6 +82,7 @@ resource "google_compute_instance" "shard1" {
   
   network_interface {
     network = "default"
+    #network_ip = "10.132.0.51"
     access_config {}
   }
   # Upload the ssh public key
@@ -135,6 +137,7 @@ resource "google_compute_instance" "shard2" {
   
   network_interface {
     network = "default"
+    #network_ip = "10.132.0.52"
     access_config {}
   }
   # Upload the ssh public key
@@ -189,6 +192,7 @@ resource "google_compute_instance" "mongos" {
   
   network_interface {
     network = "default"
+    #network_ip = "10.132.0.40"
     access_config {}
   }
   # Upload the ssh public key

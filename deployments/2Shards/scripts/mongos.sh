@@ -9,7 +9,7 @@ echo \
 sudo apt-get update
 sudo apt-get --assume-yes install docker-ce docker-ce-cli containerd.io
 # Run the MongoDB container
-sudo docker run --name mongodb -p 27017:27017 -d mongo:5.0.4
+sudo docker run --name mongodb -p 27019:27019 -d mongo:5.0.4
 until [ "`sudo docker inspect -f {{.State.Running}} mongodb`"=="true" ]; do
     sleep 0.1;
 done;
@@ -21,5 +21,5 @@ sudo docker cp /tmp/initiate.js mongodb:/initiate.js
 sudo docker cp ./customdata mongodb:/customdata
 sudo docker cp ./logging mongodb:/logging
 # # Run the config server
-#sudo docker exec mongodb /bin/sh -c "mongod --config mongos.conf --fork --logpath /logging/mongos.log"
-#sudo docker exec mongodb /bin/sh -c "mongosh --norc localhost:27018 ./initiate.js"
+#sudo docker exec mongodb /bin/sh -c "mongos --config mongos.conf --fork --logpath /logging/mongos.log"
+#sudo docker exec mongodb /bin/sh -c "mongosh --norc localhost:27019 ./initiate.js"

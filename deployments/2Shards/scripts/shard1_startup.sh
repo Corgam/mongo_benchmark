@@ -9,7 +9,7 @@ echo \
 sudo apt-get update
 sudo apt-get --assume-yes install docker-ce docker-ce-cli containerd.io
 # Run the MongoDB container
-sudo docker run --name mongodb -p 27017:27017 -d mongo:5.0.4
+sudo docker run --name mongodb -p 27018:27018 -d mongo:5.0.4
 until [ "`sudo docker inspect -f {{.State.Running}} mongodb`"=="true" ]; do
     sleep 0.1;
 done;

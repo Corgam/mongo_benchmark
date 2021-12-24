@@ -1,6 +1,7 @@
 # Additional
 Benchmark*
 deployments/*/mongokey
+deployments/*/clientkey
 deployments/*/terraform*
 deployments/*/.terraform*
 client/*/terraform*

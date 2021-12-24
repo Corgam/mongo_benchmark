@@ -1,25 +1,12 @@
-#! /bin/bash
-# Download docker
-sudo apt-get update
-sudo apt-get --assume-yes install ca-certificates curl gnupg lsb-release
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-sudo apt-get --assume-yes install docker-ce docker-ce-cli containerd.io
-# Run the MongoDB container
-sudo docker run --name mongodb -p 27018:27018 -d mongo:5.0.4
-until [ "`sudo docker inspect -f {{.State.Running}} mongodb`"=="true" ]; do
-    sleep 0.1;
-done;
-# Copy all necessary files to the container
-sudo mkdir customdata
-sudo mkdir logging
-sudo docker cp /tmp/shard1.conf mongodb:/shard1.conf
-sudo docker cp /tmp/initiate.js mongodb:/initiate.js
-sudo docker cp ./customdata mongodb:/customdata
-sudo docker cp ./logging mongodb:/logging
-# # Run the config server
-sudo docker exec mongodb /bin/sh -c "mongod --config shard1.conf --fork --logpath /logging/shard1.log"
-sudo docker exec mongodb /bin/sh -c "mongosh --norc localhost:27018 ./initiate.js"
+# #! /bin/bash
+# Install MongoDB
+sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv B00A0BD1E2C63C11
+echo "deb [arch=amd64] http://repo.mongodb.org/apt/ubuntu $(lsb_release -sc)/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org.list
+sudo apt update
+sudo apt --assume-yes install mongodb-org
+# Make necessary directories
+sudo mkdir /tmp/database
+sudo mkdir /tmp/logging
+# Run the shard
+sudo mongod --config /tmp/shard1.conf --fork --logpath /tmp/logging/shard1.log
+sudo mongosh --norc localhost:27018 /tmp/initiate.js

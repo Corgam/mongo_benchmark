@@ -21,7 +21,7 @@ resource "google_compute_instance" "configserver" {
   # Specify the image as: container optimized OS
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+      image = "ubuntu-os-cloud/ubuntu-minimal-2004-focal-v20211209"
     }
    }
   
@@ -76,7 +76,7 @@ resource "google_compute_instance" "shard1" {
   # Specify the image as: container optimized OS
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+      image = "ubuntu-os-cloud/ubuntu-minimal-2004-focal-v20211209"
     }
    }
   
@@ -131,7 +131,7 @@ resource "google_compute_instance" "shard2" {
   # Specify the image as: container optimized OS
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+      image = "ubuntu-os-cloud/ubuntu-minimal-2004-focal-v20211209"
     }
    }
   
@@ -186,7 +186,7 @@ resource "google_compute_instance" "mongos" {
   # Specify the image as: container optimized OS
   boot_disk {
     initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-minimal-2110-impish-v20211207"
+      image = "ubuntu-os-cloud/ubuntu-minimal-2004-focal-v20211209"
     }
    }
   
@@ -212,8 +212,8 @@ resource "google_compute_instance" "mongos" {
   }
   # Upload the js file for init
   provisioner "file" {
-    source = "scripts/initiate.js"
-    destination = "/tmp/initiate.js"
+    source = "scripts/mongos.js"
+    destination = "/tmp/mongos.js"
     connection {
       type = "ssh"
       user = "ubuntu"

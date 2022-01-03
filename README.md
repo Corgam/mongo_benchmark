@@ -15,6 +15,8 @@ This is a repository containing a MongoDB Database Benchmark. The goal of the Be
 
 ### 2. Running the benchmark
 
+Before running the benchmark, make sure that all Mongo's VMs are ready to be used and connected to.
+
 1. Run `make benchmark` command to create a Benchmarking Client VM on GCP.
 2. After VM is ready, the benchmark will start immediately.
 3. Wait until the end of the benchmark (the progress can be seen in the terminal).

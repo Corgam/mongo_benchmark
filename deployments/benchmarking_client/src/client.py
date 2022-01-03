@@ -112,7 +112,7 @@ def cleanUp():
     return 1
 
 def getCurrentTime():
-    return datetime.now().strftime("%d/%m/%Y,%H:%M:%S")
+    return datetime.now().strftime("%d/%m/%Y,%H:%M:%S.%f")
 
 
 if __name__ == '__main__':

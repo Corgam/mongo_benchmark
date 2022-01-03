@@ -1,6 +1,6 @@
-.PHONY: setup-mongo benchmark
+.PHONY: mongo benchmark
 
-setup-mongo:
+mongo:
 	cd deployments/${N}Shards && terraform apply -auto-approve
 
 benchmark:

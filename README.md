@@ -11,7 +11,6 @@ This is a repository containing a MongoDB Database Benchmark. The goal of the Be
 1. Type your credentials for Google Cloud Platform in the config file (used by Terraform to create VMs).
 2. Run `make setup-mongo N=SHARDS_NUMBER` command in order to create MongoDB's VMs on GCP, with `N` equal to the number of shards the Mongo database will have (either `1`,`2` or `3`). For example: `make setup-mongo N=2` will setup Mongo database with 2 shards.
 3. Wait until the VMs are ready.
-4. Run the benchmark.
 
 ### 2. Running the benchmark
 

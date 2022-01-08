@@ -54,6 +54,17 @@ resource "google_compute_instance" "benchmarking_client" {
       private_key = file("./clientkey")
     } 
   }
+  # Upload the dataset file
+  provisioner "file" {
+    source = "data/dataset.csv"
+    destination = "/tmp/dataset.csv"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./clientkey")
+    } 
+  }
   # Upload the python file
   provisioner "file" {
     source = "src/client.py"
@@ -75,4 +86,10 @@ resource "google_compute_instance" "benchmarking_client" {
       private_key = file("./clientkey")
     } 
   }
+}
+
+resource "local_file" "clientIP" {
+    depends_on = [google_compute_instance.benchmarking_client]
+    content = "${google_compute_instance.benchmarking_client.network_interface.0.access_config.0.nat_ip}"
+    filename = "clientIP.txt"
 }

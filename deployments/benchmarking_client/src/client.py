@@ -2,13 +2,23 @@ from pymongo import MongoClient
 from multiprocessing import Process
 import time, os, toml, shutil
 from datetime import datetime
+from csv import DictReader
 
 CONFIG_PATH = "/tmp/config.toml"
+RESULTS_PATH = "/tmp/results.txt"
+DATASET_PATH = "/tmp/dataset.csv"
+DATABASE_NAME = "worship"
+COLLECTION_NAME = "places"
 
 # Global variables
 dirName : str = None
 procs = []
 finalNumberOfProcesses = 0
+
+
+def getCurrentTime():
+    return datetime.now().strftime("%d/%m/%Y,%H:%M:%S.%f")
+
 
 def initLogging(config):
     print("Starting logging..")
@@ -30,17 +40,41 @@ def initLogging(config):
     
 
 def preLoad():
-    print("Preloading...")
+    print("Starting preloading...")
     preload = open(dirName+"/preload.txt", "a")
-    preload.write(f"{getCurrentTime()},Preload,MainProcess,Started\n")
-    #client = MongoClient('mongodb://mongos:27019')
-    preload.write(f"{getCurrentTime()},Preload,MainProcess,Finished\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedPreload\n")
+    # Connect to the mongos
+    client = MongoClient("mongodb://mongos:27017")
+    db = client[DATABASE_NAME]
+    collection = db[COLLECTION_NAME]
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,ConnectedToMongo\n")
+    # Start loading the dataset
+    with open(DATASET_PATH,"r", encoding="utf-8-sig") as dataset:
+        dataset_reader = DictReader(dataset)
+        # Read every row
+        preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedLoadingDataset\n")
+        loadingStatus = 0
+        for row in dataset_reader:
+            # Prepare for insertion
+            location = {"location":{"type":"Point", "coordinates":[row['X'],row['Y']]}}
+            row.pop("X")
+            row.pop("Y")
+            row.update(location)
+            # Insert
+            collection.insert_one(row)
+            # Log from time to time
+            loadingStatus += 1
+            if loadingStatus % 5000 == 0:
+                print(f"Loaded {loadingStatus} observations...")
+                preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
     preload.close()
+    print("Finshed preloading...")
     return 1
 
 def warmUp():
     return 1
-
 
 
 def startBenchmark(config):
@@ -74,6 +108,7 @@ def startWorker(id : int, dirName: str):
     db = client["testDatabase"]
     collection = db["testCollection"]
     # Start sending the queries
+    return
     i = 0
     while True:
         # Sending the query
@@ -99,7 +134,7 @@ def cleanUp():
     for i in range(finalNumberOfProcesses):
         fileNames.append(dirName+f"/worker{i}.txt")
     # Create the final result file
-    with open(dirName+".txt", "wb") as finalFile:
+    with open(RESULTS_PATH, "wb") as finalFile:
         for f in fileNames:
             with open(f, 'rb') as fd:
                 shutil.copyfileobj(fd,finalFile)
@@ -110,10 +145,6 @@ def cleanUp():
         print("Error: %s - %s." % (e.filename, e.strerror))
     # Close the file
     return 1
-
-def getCurrentTime():
-    return datetime.now().strftime("%d/%m/%Y,%H:%M:%S.%f")
-
 
 if __name__ == '__main__':
     # Open the config

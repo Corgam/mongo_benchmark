@@ -8,14 +8,16 @@ This is a repository containing a MongoDB Database Benchmark. The goal of the Be
 
 ### 1. Requirements
 
-1. Setup Ubuntu (...) or other OS with Linux terminal.
-2. Install Terraform (...)
-3. Install Git and clone this repository (...)
+1. Setup a default Ubuntu X.XX VM inside the Compute Engine on the GCP.
+2. Download the Git (`sudo apt-get install git`) and clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
+3. Run the `make setup` to install all necessary applications.
+4. Change the config file to your liking.
+5. Upload the JSON file containing the credentials to your gcp account as specified in the config 
 
 ### 2. Setting up MongoDB
 
 1. Type your credentials for Google Cloud Platform in the config file (used by Terraform to create VMs).
-2. Run `make mongo N=SHARDS_NUMBER` command in order to create MongoDB's VMs on GCP, with `N` equal to the number of shards the Mongo database will have (either `1`,`2` or `3`). For example: `make mongo N=2` will setup Mongo database with 2 shards.
+2. Run `make mongo n=SHARDS_NUMBER` command in order to create MongoDB's VMs on GCP, with `n` equal to the number of shards the Mongo database will have (either `1`,`2` or `3`). For example: `make mongo n=2` will setup Mongo database with 2 shards.
 3. Wait until the VMs are ready.
 
 ### 3. Running the benchmark

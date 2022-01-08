@@ -4,8 +4,8 @@ setup:
 	sudo apt-get -y install git
 
 mongo:
-	cd deployments/${N}Shards && terraform init
-	cd deployments/${N}Shards && terraform apply -auto-approve
+	cd deployments/${n}Shards && terraform init
+	cd deployments/${n}Shards && terraform apply -auto-approve
 
 benchmark:
 	cd deployments/benchmarking_client && terraform init

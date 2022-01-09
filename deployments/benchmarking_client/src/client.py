@@ -1,6 +1,6 @@
-from pymongo import MongoClient
 from multiprocessing import Process
 import time, os, toml, shutil
+import pymongo
 from datetime import datetime
 from csv import DictReader
 
@@ -44,7 +44,7 @@ def preLoad():
     preload = open(dirName+"/preload.txt", "a")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedPreload\n")
     # Connect to the mongos
-    client = MongoClient("mongodb://mongos:27017")
+    client = pymongo.MongoClient("mongodb://mongos:27017")
     db = client[DATABASE_NAME]
     collection = db[COLLECTION_NAME]
     preload.write(f"{getCurrentTime()},Preload,MainProcess,ConnectedToMongo\n")
@@ -56,7 +56,7 @@ def preLoad():
         loadingStatus = 0
         for row in dataset_reader:
             # Prepare for insertion
-            location = {"location":{"type":"Point", "coordinates":[row['X'],row['Y']]}}
+            location = {"location":{"type":"Point", "coordinates":[float(row['X']),float(row['Y'])]}}
             row.pop("X")
             row.pop("Y")
             row.update(location)
@@ -67,6 +67,9 @@ def preLoad():
             if loadingStatus % 5000 == 0:
                 print(f"Loaded {loadingStatus} observations...")
                 preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
+    # Create an geospatial index
+    collection.create_index([("location",pymongo.GEOSPHERE)])
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
     preload.close()
@@ -104,7 +107,7 @@ def startWorker(id : int, dirName: str):
     file.write(f"{getCurrentTime()},Benchmark,Process{id},Created\n")
     file.close()
     # Connect to the database
-    client = MongoClient("mongodb://mongos:27017")
+    client = pymongo.MongoClient("mongodb://mongos:27017")
     db = client["testDatabase"]
     collection = db["testCollection"]
     # Start sending the queries

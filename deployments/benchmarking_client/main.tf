@@ -8,7 +8,8 @@ terraform {
 }
 
 provider "google" {
-  project = "351640241283"
+  credentials = file("./../../credentials.json")
+  project = "mongodb-benchmark"
   region = "europe-west1"
   zone = "europe-west1-b"
 }

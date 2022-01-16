@@ -8,12 +8,13 @@ This is a repository containing a MongoDB Database Benchmark. The goal of the Be
 
 ### 1. Requirements
 
-1. Setup a default Ubuntu X.XX VM inside the Compute Engine on the GCP.
-2. Download the Git (`sudo apt-get install git`) and clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
-3. Run the `make setup` to install all necessary applications.
-4. Change the config file to your liking.
-5. Log into your GCP account and create a new project called `mongodb-benchmark`.
-6. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where the `config.toml` and `Makefile` are)
+1. Log into your GCP account and create a new project called `mongodb-benchmark`. Use this project for further instructions.
+2. Setup a default Ubuntu X.XX VM inside the Compute Engine and SSH into it.
+3. Download the Git (`sudo apt-get install git`) and clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
+4. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where the `config.toml` and `Makefile` are)
+5. Change the config file to your liking.
+6. Run the `make setup` to install all necessary applications.
+
 
 ### 2. Setting up MongoDB
 

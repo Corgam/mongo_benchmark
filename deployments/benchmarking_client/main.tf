@@ -57,8 +57,8 @@ resource "google_compute_instance" "benchmarking_client" {
   }
   # Upload the dataset file
   provisioner "file" {
-    source = "data/dataset.csv"
-    destination = "/tmp/dataset.csv"
+    source = "data/cities_above_1000.csv"
+    destination = "/tmp/cities_above_1000.csv"
     connection {
       type = "ssh"
       user = "ubuntu"

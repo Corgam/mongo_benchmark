@@ -1,15 +1,29 @@
+from math import ceil
 from multiprocessing import Process
-import time, os, toml, shutil
+import time, os, toml, shutil, math, random
 import pymongo
 from datetime import datetime
 from csv import DictReader
+from matplotlib import pyplot as plt
 
+# Path variables
 CONFIG_PATH = "/tmp/config.toml"
 RESULTS_PATH = "/tmp/results.txt"
-DATASET_PATH = "/tmp/dataset.csv"
+DATASET_PATH = "/tmp/cities_above_1000.csv"
 DATABASE_NAME = "worship"
 COLLECTION_NAME = "places"
-
+# Radius variables
+SMALLEST_POPULATION = 1000
+BIGGEST_POPULATION = 22315474
+SMALLEST_POPULATION_RADIUS = 1000
+BIGGEST_POPULATION_RADIUS = 44927
+SMALLEST_POPULATION_RESTAURANTS = 2
+BIGGEST_POPULATION_RESTAURANTS = 100000
+# Lists
+RESTAURANT_TYPES = ["Italian", "French", "Japanese", "Polish", "Sushi", "Fastfood", "Home Meals", "Slowfood", "Burgers", "Pizza", "Chinese", "Fushion", "Vegan", "Vegetarian", "Seafood"]
+RESTAURANT_NAMES = ["Bar", "Restaurant", "Hotel", "Motel", "Food Truck", "Cafe", "Stand", "Dinner", "Bistro"]
+RESTAURANT_PRICES = ["$", "$$", "$$$"]
+RESTAURANT_OUTSIDE = [True, False]
 # Global variables
 dirName : str = None
 procs = []
@@ -39,6 +53,81 @@ def initLogging(config):
     return 1
     
 
+def random_point_in_disk(max_radius):
+    # Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
+    radius = random.uniform(0,max_radius)
+    radians = random.uniform(0, 2*math.pi)
+    x = radius * math.cos(radians)
+    y = radius * math.sin(radians)
+    return [x,y]
+
+
+def random_location(lon, lat, max_radius):
+    # Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
+    EarthRadius = 6371
+    OneDegree = EarthRadius * 2 * math.pi / 360 * 1000 # 1° latitude in meters
+    dx, dy = random_point_in_disk(max_radius)
+    random_lat = lat + dy / OneDegree
+    random_lon = lon + dx / ( OneDegree * math.cos(lat * math.pi / 180) )
+    return[random_lon, random_lat]
+    
+
+def addRestaurants_with_plot(city, collection):
+    # Calculate radius
+    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
+    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
+    radius = ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
+    # Calculate number of restaurants
+    restaurants_no = ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
+    # Create restaurants
+    x = []
+    y = []
+    coordinates = city["location"]["coordinates"]
+    for i in range(restaurants_no):
+        location = random_location(coordinates[0], coordinates[1], radius)
+        restaurant = createRestaurantJSON(location, city["Name"])
+        x.append(location[0])
+        y.append(location[1])
+        #collection.insert_one(restaurant)
+    plt.scatter(coordinates[0],coordinates[1], color = "red")
+    plt.scatter(x,y)
+    plt.show()
+    plt.close()
+
+
+def createRestaurantJSON(location, city):
+    restaurant = {}
+    type = random.choice(RESTAURANT_TYPES)
+    name = random.choice(RESTAURANT_NAMES)
+    restaurant.update({"name":f"{type} {name} {random.randint(1,1000)}"})
+    restaurant.update({"city":city})
+    restaurant.update({"cuisine": type})
+    restaurant.update({"opened": random.randint(1970,2022)})
+    restaurant.update({"rating": random.randint(1,5)})
+    restaurant.update({"reviews": random.randint(1,1000)})
+    restaurant.update({"pricing": random.choice(RESTAURANT_PRICES)})
+    restaurant.update({"outside_area": random.choice(RESTAURANT_OUTSIDE)})
+    restaurant.update({"location":{"type":"Point", "coordinates":[float(location[0]), float(location[1])]}})
+    return restaurant
+    
+
+def addRestaurants(city, collection):
+    # Calculate radius
+    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
+    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
+    radius = ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
+    # Calculate number of restaurants
+    restaurants_no = ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
+    # Create restaurants
+    coordinates = city["location"]["coordinates"]
+    for i in range(restaurants_no):
+        location = random_location(coordinates[0], coordinates[1], radius)
+        restaurant = createRestaurantJSON(location, city["Name"])
+        collection.insert_one(restaurant)
+    return restaurants_no
+
+
+
 def preLoad():
     print("Starting preloading...")
     preload = open(dirName+"/preload.txt", "a")
@@ -49,24 +138,28 @@ def preLoad():
     collection = db[COLLECTION_NAME]
     preload.write(f"{getCurrentTime()},Preload,MainProcess,ConnectedToMongo\n")
     # Start loading the dataset
-    with open(DATASET_PATH,"r", encoding="utf-8-sig") as dataset:
-        dataset_reader = DictReader(dataset)
+    restaurants_added = 0
+    with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
+        dataset_reader = DictReader(dataset, delimiter=';')
         # Read every row
         preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedLoadingDataset\n")
         loadingStatus = 0
         for row in dataset_reader:
-            # Prepare for insertion
-            location = {"location":{"type":"Point", "coordinates":[float(row['X']),float(row['Y'])]}}
-            row.pop("X")
-            row.pop("Y")
+            # Prepare coordinates
+            coordinates = row['Coordinates'].split(",")
+            location = {"location":{"type":"Point", "coordinates":[float(coordinates[0]), float(coordinates[1])]}}
+            row.pop("Coordinates")
             row.update(location)
             # Insert
             collection.insert_one(row)
+            # Add the restaurants
+            restaurants_added += addRestaurants(row, collection)
             # Log from time to time
             loadingStatus += 1
             if loadingStatus % 5000 == 0:
-                print(f"Loaded {loadingStatus} observations...")
+                print(f"Loaded {loadingStatus} cities (with {restaurants_added} restaurants)...")
                 preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
+    print(f"Added in total {restaurants_added} restaurants the the database.")
     # Create an geospatial index
     collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")

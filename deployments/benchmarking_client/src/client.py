@@ -7,9 +7,11 @@ from csv import DictReader
 from matplotlib import pyplot as plt
 
 # Path variables
-CONFIG_PATH = "/tmp/config.toml"
+#CONFIG_PATH = "/tmp/config.toml"
+CONFIG_PATH = "config.toml"
 RESULTS_PATH = "/tmp/results.txt"
-DATASET_PATH = "/tmp/cities_above_1000.csv"
+#DATASET_PATH = "/tmp/cities_above_1000.csv"
+DATASET_PATH = "deployments/benchmarking_client/data/cities_above_1000.csv"
 DATABASE_NAME = "worship"
 COLLECTION_NAME = "places"
 # Radius variables
@@ -70,32 +72,9 @@ def random_location(lon, lat, max_radius):
     random_lat = lat + dy / OneDegree
     random_lon = lon + dx / ( OneDegree * math.cos(lat * math.pi / 180) )
     return[random_lon, random_lat]
-    
-
-def addRestaurants_with_plot(city, collection):
-    # Calculate radius
-    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
-    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
-    radius = ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
-    # Calculate number of restaurants
-    restaurants_no = ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
-    # Create restaurants
-    x = []
-    y = []
-    coordinates = city["location"]["coordinates"]
-    for i in range(restaurants_no):
-        location = random_location(coordinates[0], coordinates[1], radius)
-        restaurant = createRestaurantJSON(location, city["Name"])
-        x.append(location[0])
-        y.append(location[1])
-        #collection.insert_one(restaurant)
-    plt.scatter(coordinates[0],coordinates[1], color = "red")
-    plt.scatter(x,y)
-    plt.show()
-    plt.close()
 
 
-def createRestaurantJSON(location, city):
+def createRestaurantJSON(long, lat, city):
     restaurant = {}
     type = random.choice(RESTAURANT_TYPES)
     name = random.choice(RESTAURANT_NAMES)
@@ -107,7 +86,7 @@ def createRestaurantJSON(location, city):
     restaurant.update({"reviews": random.randint(1,1000)})
     restaurant.update({"pricing": random.choice(RESTAURANT_PRICES)})
     restaurant.update({"outside_area": random.choice(RESTAURANT_OUTSIDE)})
-    restaurant.update({"location":{"type":"Point", "coordinates":[float(location[0]), float(location[1])]}})
+    restaurant.update({"location":{"type":"Point", "coordinates":[float(long), float(lat)]}})
     return restaurant
     
 
@@ -117,15 +96,34 @@ def addRestaurants(city, collection):
     population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
     radius = ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
     # Calculate number of restaurants
-    restaurants_no = ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
+    restaurants_no = 2#ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
     # Create restaurants
-    coordinates = city["location"]["coordinates"]
+    coord = city["location"]["coordinates"]
     for i in range(restaurants_no):
-        location = random_location(coordinates[0], coordinates[1], radius)
-        restaurant = createRestaurantJSON(location, city["Name"])
+        long, lat = random_location(coord[0], coord[1], radius)
+        restaurant = createRestaurantJSON(long, lat, city["Name"])
         collection.insert_one(restaurant)
     return restaurants_no
 
+
+def generateQuery(biggest_cities_coords: list):
+    """
+    """
+    meters = random.randint(5000,50000) # Choose the search radius: from 5km to 50km
+    # TODO: Choose points between cities
+    coordinates = random.choice(biggest_cities_coords) # Choose one of the biggest cities
+    queryType = random.choice(["radiusSearch","restaurantType","ratingScore", "outsideGarden", "cheapPlaces"]) # Choose the type of the query
+    if queryType == "radiusSearch":
+        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } } }
+    elif queryType == "restaurantType":
+        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "cuisine": { "$eq": random.choice(RESTAURANT_TYPES)}  }
+    elif queryType == "ratingScore":
+        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "rating": { "$gt": random.randint(0,4)}  }
+    elif queryType == "outsideGarden":
+        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "outside_area": { "$eq": random.choice([True, False])}  }
+    elif queryType == "cheapPlaces":
+        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "pricing": { "$eq": random.choice(["$", "$$", "$$$"])}  }
+    return query
 
 
 def preLoad():
@@ -147,13 +145,14 @@ def preLoad():
         for row in dataset_reader:
             # Prepare coordinates
             coordinates = row['Coordinates'].split(",")
-            location = {"location":{"type":"Point", "coordinates":[float(coordinates[0]), float(coordinates[1])]}}
+             # Inside the dataset, long and lat are switched, so lat is first, long second. We need to switch them arround.
+            location = {"location":{"type":"Point", "coordinates":[float(coordinates[1]), float(coordinates[0])]}} 
             row.pop("Coordinates")
             row.update(location)
             # Insert
-            collection.insert_one(row)
+            #collection.insert_one(row)
             # Add the restaurants
-            restaurants_added += addRestaurants(row, collection)
+            #restaurants_added += addRestaurants(row, collection)
             # Log from time to time
             loadingStatus += 1
             if loadingStatus % 5000 == 0:
@@ -161,7 +160,7 @@ def preLoad():
                 preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
     print(f"Added in total {restaurants_added} restaurants the the database.")
     # Create an geospatial index
-    collection.create_index([("location",pymongo.GEOSPHERE)])
+    #collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
@@ -169,16 +168,21 @@ def preLoad():
     print("Finshed preloading...")
     return 1
 
-def warmUp():
-    return 1
-
 
 def startBenchmark(config):
     print("Starting benchmark...")
     global procs, dirName, finalNumberOfProcesses
+    # Create a array of biggest cities
+    biggest_cities_coords = []
+    with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
+        dataset_reader = DictReader(dataset, delimiter=';')
+        for row in dataset_reader:
+            coordinatesString = row['Coordinates'].split(",")
+            coordinates = [float(coordinatesString[1]), float(coordinatesString[0])]
+            biggest_cities_coords.append(coordinates)
     # Creating new processes
     for id in range(3):
-        proc = Process(target=startWorker, args=(id, dirName, ))
+        proc = Process(target=startWorker, args=(id, dirName, biggest_cities_coords, ))
         procs.append(proc)
         proc.start()
         time.sleep(config["new_process_interval"])
@@ -191,7 +195,7 @@ def startBenchmark(config):
     return 1
 
 
-def startWorker(id : int, dirName: str):
+def startWorker(id : int, dirName: str, biggest_cities_coords: list):
     """
     Single worker thread which connects to the MongoDB and continously sends queries.
     """
@@ -204,7 +208,6 @@ def startWorker(id : int, dirName: str):
     db = client["testDatabase"]
     collection = db["testCollection"]
     # Start sending the queries
-    return
     i = 0
     while True:
         # Sending the query
@@ -212,14 +215,13 @@ def startWorker(id : int, dirName: str):
         file.write(f"{getCurrentTime()},Benchmark,Process{id},SendingQuery,{i}\n")
         file.close()
         print(f"Process{id}: Sending query{i}...")
-        document = {"processID": id, "queryID" : i, "name": "Corgam"}
-        response = collection.insert_one(document)
+        query = generateQuery(biggest_cities_coords)
+        response = collection.find(query)
         # Receiving the response
         file = open(dirName+f"/worker{id}.txt", "a")
         file.write(f"{getCurrentTime()},Benchmark,Process{id},ReceivedResponse,{i},{response.acknowledged},{response.inserted_id}\n")
         file.close()
         i += 1
-        time.sleep(1)
     # Close the file
 
 def cleanUp():
@@ -251,9 +253,6 @@ if __name__ == '__main__':
         print("ERROR")
     # Start the preload 
     if (preLoad() != 1):
-        print("ERROR")
-    # Start the warm-up
-    if (warmUp() != 1):
         print("ERROR")
     # Start the experiment
     if (startBenchmark(config) != 1):

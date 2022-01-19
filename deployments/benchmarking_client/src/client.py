@@ -1,19 +1,23 @@
 from math import ceil
 from multiprocessing import Process
+from pydoc import resolve
 import time, os, toml, shutil, math, random
 import pymongo
 from datetime import datetime
 from csv import DictReader
 from matplotlib import pyplot as plt
 
+# Debug
+CONFIG_PATH = "config.toml"
+DATASET_PATH = "deployments/benchmarking_client/data/cities_above_1000.csv"
+DATABASE_URL = "mongodb://localhost:27017"
 # Path variables
 #CONFIG_PATH = "/tmp/config.toml"
-CONFIG_PATH = "config.toml"
 RESULTS_PATH = "/tmp/results.txt"
 #DATASET_PATH = "/tmp/cities_above_1000.csv"
-DATASET_PATH = "deployments/benchmarking_client/data/cities_above_1000.csv"
 DATABASE_NAME = "worship"
 COLLECTION_NAME = "places"
+#DATABASE_URL = "mongodb://mongos:27017"
 # Radius variables
 SMALLEST_POPULATION = 1000
 BIGGEST_POPULATION = 22315474
@@ -26,6 +30,10 @@ RESTAURANT_TYPES = ["Italian", "French", "Japanese", "Polish", "Sushi", "Fastfoo
 RESTAURANT_NAMES = ["Bar", "Restaurant", "Hotel", "Motel", "Food Truck", "Cafe", "Stand", "Dinner", "Bistro"]
 RESTAURANT_PRICES = ["$", "$$", "$$$"]
 RESTAURANT_OUTSIDE = [True, False]
+# Query probabilities
+PROB_END_QUERYING = 0.2
+PROB_ADDITIONAL_FILTER = 0.6
+
 # Global variables
 dirName : str = None
 procs = []
@@ -50,7 +58,7 @@ def initLogging(config):
     header.write("Number of MongoDB shards, "+ str(config["number_of_mongo_shards"]) +"\n")
     header.write("Time of benchmark, "+ timeStr+"\n")
     header.write("HEADER, End\n")
-    header.write("date,time,phase,processName,action,queryID,ifAcknowledged,insertedID\n")
+    header.write("date,time,phase,processName,action,queryID,ifAcknowledged,numberOfResults,insertedID\n")
     header.close()
     return 1
     
@@ -89,12 +97,14 @@ def createRestaurantJSON(long, lat, city):
     restaurant.update({"location":{"type":"Point", "coordinates":[float(long), float(lat)]}})
     return restaurant
     
+def calculateRadius(city):
+    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
+    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
+    return ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
 
 def addRestaurants(city, collection):
     # Calculate radius
-    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
-    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
-    radius = ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
+    radius = calculateRadius(city)
     # Calculate number of restaurants
     restaurants_no = 2#ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
     # Create restaurants
@@ -106,23 +116,27 @@ def addRestaurants(city, collection):
     return restaurants_no
 
 
-def generateQuery(biggest_cities_coords: list):
+def addRandomFilterToQuery(query: dict):
+    queryType = random.choice(["restaurantType","ratingScore", "outsideGarden", "cheapPlaces"]) # Choose the type of the query
+    if queryType == "restaurantType":
+        query["cuisine"] = { "$eq": random.choice(RESTAURANT_TYPES)}
+    elif queryType == "ratingScore":
+        query["rating"] = { "$gt": random.randint(0,4)}
+    elif queryType == "outsideGarden":
+        query["outside_area"] = { "$eq": random.choice([True, False])}
+    elif queryType == "cheapPlaces":
+        query["pricing"] = { "$eq": random.choice(["$", "$$", "$$$"])}
+    return query
+
+def generateBasicQuery(biggest_cities_data: list):
     """
+    Generates a query for the database.
     """
     meters = random.randint(5000,50000) # Choose the search radius: from 5km to 50km
-    # TODO: Choose points between cities
-    coordinates = random.choice(biggest_cities_coords) # Choose one of the biggest cities
-    queryType = random.choice(["radiusSearch","restaurantType","ratingScore", "outsideGarden", "cheapPlaces"]) # Choose the type of the query
-    if queryType == "radiusSearch":
-        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } } }
-    elif queryType == "restaurantType":
-        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "cuisine": { "$eq": random.choice(RESTAURANT_TYPES)}  }
-    elif queryType == "ratingScore":
-        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "rating": { "$gt": random.randint(0,4)}  }
-    elif queryType == "outsideGarden":
-        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "outside_area": { "$eq": random.choice([True, False])}  }
-    elif queryType == "cheapPlaces":
-        query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } }, "pricing": { "$eq": random.choice(["$", "$$", "$$$"])}  }
+    random_city = random.choice(biggest_cities_data) # Choose one of the biggest cities
+    # Generate random coordinate inside the city's radius
+    coordinates = random_location(random_city[0], random_city[1], random_city[2])
+    query = { "location": { "$nearSphere": { "$geometry": { "type": "Point", "coordinates": coordinates }, "$maxDistance": meters } } }
     return query
 
 
@@ -131,7 +145,7 @@ def preLoad():
     preload = open(dirName+"/preload.txt", "a")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedPreload\n")
     # Connect to the mongos
-    client = pymongo.MongoClient("mongodb://mongos:27017")
+    client = pymongo.MongoClient(DATABASE_URL)
     db = client[DATABASE_NAME]
     collection = db[COLLECTION_NAME]
     preload.write(f"{getCurrentTime()},Preload,MainProcess,ConnectedToMongo\n")
@@ -150,7 +164,7 @@ def preLoad():
             row.pop("Coordinates")
             row.update(location)
             # Insert
-            #collection.insert_one(row)
+            collection.insert_one(row)
             # Add the restaurants
             #restaurants_added += addRestaurants(row, collection)
             # Log from time to time
@@ -160,7 +174,7 @@ def preLoad():
                 preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
     print(f"Added in total {restaurants_added} restaurants the the database.")
     # Create an geospatial index
-    #collection.create_index([("location",pymongo.GEOSPHERE)])
+    collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
@@ -173,21 +187,22 @@ def startBenchmark(config):
     print("Starting benchmark...")
     global procs, dirName, finalNumberOfProcesses
     # Create a array of biggest cities
-    biggest_cities_coords = []
+    biggest_cities_data = []
     with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
         dataset_reader = DictReader(dataset, delimiter=';')
-        for row in dataset_reader:
-            coordinatesString = row['Coordinates'].split(",")
-            coordinates = [float(coordinatesString[1]), float(coordinatesString[0])]
-            biggest_cities_coords.append(coordinates)
+        for city in dataset_reader:
+            coordinatesString = city['Coordinates'].split(",")
+            radius = calculateRadius(city)
+            city_data = [float(coordinatesString[1]), float(coordinatesString[0]), radius]
+            biggest_cities_data.append(city_data)
     # Creating new processes
     for id in range(3):
-        proc = Process(target=startWorker, args=(id, dirName, biggest_cities_coords, ))
+        proc = Process(target=startWorker, args=(id, dirName, biggest_cities_data, ))
         procs.append(proc)
         proc.start()
         time.sleep(config["new_process_interval"])
     # Join all proceses
-    time.sleep(60)
+    time.sleep(30)
     finalNumberOfProcesses = len(procs)
     for proc in procs:
         proc.kill()
@@ -195,35 +210,59 @@ def startBenchmark(config):
     return 1
 
 
-def startWorker(id : int, dirName: str, biggest_cities_coords: list):
+def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
     """
     Single worker thread which connects to the MongoDB and continously sends queries.
     """
     # TODO: Rework the file opening and closing
-    file = open(dirName+f"/worker{id}.txt", "a")
-    file.write(f"{getCurrentTime()},Benchmark,Process{id},Created\n")
-    file.close()
+    file = open(dirName+f"/worker{process_id}.txt", "a")
+    file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Created\n")
+    file.flush()
     # Connect to the database
-    client = pymongo.MongoClient("mongodb://mongos:27017")
-    db = client["testDatabase"]
-    collection = db["testCollection"]
+    client = pymongo.MongoClient(DATABASE_URL)
+    db = client[DATABASE_NAME]
+    collection = db[COLLECTION_NAME]
     # Start sending the queries
-    i = 0
+    queryID = 0
     while True:
         # Sending the query
-        file = open(dirName+f"/worker{id}.txt", "a")
-        file.write(f"{getCurrentTime()},Benchmark,Process{id},SendingQuery,{i}\n")
-        file.close()
-        print(f"Process{id}: Sending query{i}...")
-        query = generateQuery(biggest_cities_coords)
-        response = collection.find(query)
-        # Receiving the response
-        file = open(dirName+f"/worker{id}.txt", "a")
-        file.write(f"{getCurrentTime()},Benchmark,Process{id},ReceivedResponse,{i},{response.acknowledged},{response.inserted_id}\n")
-        file.close()
-        i += 1
-    # Close the file
-
+        query = generateBasicQuery(biggest_cities_data)
+        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
+        file.flush()
+        print(f"Process{process_id}: Sending query{queryID}...\n")
+        response = collection.find(query).limit(10)
+        text = list(response)
+        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
+        file.flush()
+        queryID += 1  
+        # Chance that the query will end
+        if_enough_querying = True if random.random() < PROB_END_QUERYING else False
+        if if_enough_querying:
+            continue    
+        # Handle query
+        if_additional_filter = True if random.random() < PROB_ADDITIONAL_FILTER else False
+        if if_additional_filter:
+            # Ask about additional filter
+            query = addRandomFilterToQuery(query)
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
+            file.flush()
+            print(f"Process{process_id}: Sending query{queryID}...\n")
+            response = collection.find(query).limit(10)
+            text = list(response)
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
+            file.flush()
+            queryID += 1
+        else:
+            # Look into next page
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
+            file.flush()
+            print(f"Process{process_id}: Sending query{queryID}...\n")
+            response = collection.find(query).skip(10).limit(10)
+            text = list(response)
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
+            file.flush()
+            queryID += 1
+        
 def cleanUp():
     print("Cleaning up...")
     # Prepare the list of files
@@ -252,8 +291,8 @@ if __name__ == '__main__':
     if (initLogging(config) != 1):
         print("ERROR")
     # Start the preload 
-    if (preLoad() != 1):
-        print("ERROR")
+    #if (preLoad() != 1):
+    #    print("ERROR")
     # Start the experiment
     if (startBenchmark(config) != 1):
         print("ERROR")

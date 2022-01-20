@@ -31,7 +31,7 @@ resource "google_compute_instance" "benchmarking_client" {
   }
   # Upload the ssh public key
   metadata = {
-    ssh-keys = "ubuntu:${file("./client.pub")}"
+    ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
   # Upload the config file
   provisioner "file" {

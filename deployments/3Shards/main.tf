@@ -32,7 +32,7 @@ resource "google_compute_instance" "configserver" {
   }
   # Upload the ssh public key
   metadata = {
-    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+    ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
   # Upload the config file for the configserver mongo
   provisioner "file" {
@@ -42,7 +42,7 @@ resource "google_compute_instance" "configserver" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Upload the js file for init
@@ -53,7 +53,7 @@ resource "google_compute_instance" "configserver" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Start the script for 
@@ -63,7 +63,7 @@ resource "google_compute_instance" "configserver" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
 }
@@ -87,7 +87,7 @@ resource "google_compute_instance" "shard1" {
   }
   # Upload the ssh public key
   metadata = {
-    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+    ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
   # Upload the config file for the configserver mongo
   provisioner "file" {
@@ -97,7 +97,7 @@ resource "google_compute_instance" "shard1" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Upload the js file for init
@@ -108,7 +108,7 @@ resource "google_compute_instance" "shard1" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Start the script for 
@@ -118,7 +118,7 @@ resource "google_compute_instance" "shard1" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
 }
@@ -141,7 +141,7 @@ resource "google_compute_instance" "shard2" {
   }
   # Upload the ssh public key
   metadata = {
-    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+    ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
   # Upload the config file for the configserver mongo
   provisioner "file" {
@@ -151,7 +151,7 @@ resource "google_compute_instance" "shard2" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Upload the js file for init
@@ -162,7 +162,7 @@ resource "google_compute_instance" "shard2" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Start the script for 
@@ -172,7 +172,7 @@ resource "google_compute_instance" "shard2" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
 }
@@ -195,7 +195,7 @@ resource "google_compute_instance" "shard3" {
   }
   # Upload the ssh public key
   metadata = {
-    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+    ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
   # Upload the config file for the configserver mongo
   provisioner "file" {
@@ -205,7 +205,7 @@ resource "google_compute_instance" "shard3" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Upload the js file for init
@@ -216,7 +216,7 @@ resource "google_compute_instance" "shard3" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Start the script for 
@@ -226,7 +226,7 @@ resource "google_compute_instance" "shard3" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
 }
@@ -249,7 +249,7 @@ resource "google_compute_instance" "mongos" {
   }
   # Upload the ssh public key
   metadata = {
-    ssh-keys = "ubuntu:${file("./mongokey.pub")}"
+    ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
   # Upload the config file for the configserver mongo
   provisioner "file" {
@@ -259,7 +259,7 @@ resource "google_compute_instance" "mongos" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Upload the js file for init
@@ -270,7 +270,7 @@ resource "google_compute_instance" "mongos" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
   # Start the script for 
@@ -280,7 +280,7 @@ resource "google_compute_instance" "mongos" {
       type = "ssh"
       user = "ubuntu"
       host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./mongokey")
+      private_key = file("./clientkey")
     } 
   }
 }

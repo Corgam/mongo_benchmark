@@ -1,7 +1,10 @@
 .PHONY: setup mongo benchmark clean
 
 setup:
-	sudo apt-get -y install git
+	ssh-keygen -f deployments/benchmarking_client/clientkey -P "" -q
+	ssh-keygen -f deployments/1Shards/clientkey -P "" -q
+	ssh-keygen -f deployments/2Shards/clientkey -P "" -q
+	ssh-keygen -f deployments/3Shards/clientkey -P "" -q
 
 mongo:
 	cd deployments/${n}Shards && terraform init

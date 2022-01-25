@@ -33,17 +33,6 @@ resource "google_compute_instance" "benchmarking_client" {
   metadata = {
     ssh-keys = "ubuntu:${file("./clientkey.pub")}"
   }
-  # Upload the config file
-  provisioner "file" {
-    source = "../../config.toml"
-    destination = "/tmp/config.toml"
-    connection {
-      type = "ssh"
-      user = "ubuntu"
-      host = self.network_interface[0].access_config[0].nat_ip
-      private_key = file("./clientkey")
-    } 
-  }
   # Upload the requirements file
   provisioner "file" {
     source = "requirements.txt"

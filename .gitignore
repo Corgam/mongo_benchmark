@@ -1,5 +1,6 @@
 # Additional
-Results*
+Results_*
+!data_analysis/Results_*
 clientkey*
 deployments/*/terraform*
 deployments/*/.terraform*

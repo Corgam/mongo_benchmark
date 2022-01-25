@@ -1,8 +1,0 @@
-# Main config for Mongo Benchmark client
-
-title = "MongoDB Benchmark Client Config"
-
-benchmark_run_id = 1
-number_of_mongo_shards = 1
-
-new_process_interval = 2

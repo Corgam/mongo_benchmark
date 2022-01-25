@@ -1,23 +1,21 @@
+from json import load
 from math import ceil
 from multiprocessing import Process
 from pydoc import resolve
-import time, os, toml, shutil, math, random
+import time, os, shutil, math, random
 import pymongo
 from datetime import datetime
 from csv import DictReader
-from matplotlib import pyplot as plt
 
 # Debug
-CONFIG_PATH = "config.toml"
-DATASET_PATH = "deployments/benchmarking_client/data/cities_above_1000.csv"
-DATABASE_URL = "mongodb://localhost:27017"
+#DATASET_PATH = "deployments/benchmarking_client/data/cities_above_1000.csv"
+#DATABASE_URL = "mongodb://localhost:27017"
 # Path variables
-#CONFIG_PATH = "/tmp/config.toml"
 RESULTS_PATH = "/tmp/results.txt"
-#DATASET_PATH = "/tmp/cities_above_1000.csv"
-DATABASE_NAME = "worship"
-COLLECTION_NAME = "places"
-#DATABASE_URL = "mongodb://mongos:27017"
+DATASET_PATH = "/tmp/cities_above_1000.csv"
+DATABASE_NAME = "world"
+COLLECTION_NAME = "restaurants"
+DATABASE_URL = "mongodb://mongos:27017"
 # Radius variables
 SMALLEST_POPULATION = 1000
 BIGGEST_POPULATION = 22315474
@@ -44,21 +42,20 @@ def getCurrentTime():
     return datetime.now().strftime("%d/%m/%Y,%H:%M:%S.%f")
 
 
-def initLogging(config):
+def initLogging():
     print("Starting logging..")
     global results_file, dirName
     # Create the results file
     timeStr = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    dirName = "Results"+ str(config["benchmark_run_id"]) +"_Shards"+ str(config["number_of_mongo_shards"]) +"_"+timeStr
+    dirName = "Results"+timeStr
+    # dirName = "Results"+ str(config["benchmark_run_id"]) +"_Shards"+ str(config["number_of_mongo_shards"]) +"_"+timeStr
     os.makedirs(dirName, exist_ok=True)
     header = open(dirName+"/header.txt", "a")
     # Add header
     header.write("HEADER, Start\n")
-    header.write("Benchmark id, "+ str(config["benchmark_run_id"]) +"\n")
-    header.write("Number of MongoDB shards, "+ str(config["number_of_mongo_shards"]) +"\n")
+    #header.write("Benchmark id, "+ str(config["benchmark_run_id"]) +"\n")
+    #header.write("Number of MongoDB shards, "+ str(config["number_of_mongo_shards"]) +"\n")
     header.write("Time of benchmark, "+ timeStr+"\n")
-    header.write("HEADER, End\n")
-    header.write("date,time,phase,processName,action,queryID,ifAcknowledged,numberOfResults,insertedID\n")
     header.close()
     return 1
     
@@ -86,14 +83,14 @@ def createRestaurantJSON(long, lat, city):
     restaurant = {}
     type = random.choice(RESTAURANT_TYPES)
     name = random.choice(RESTAURANT_NAMES)
-    restaurant.update({"name":f"{type} {name} {random.randint(1,1000)}"})
-    restaurant.update({"city":city})
-    restaurant.update({"cuisine": type})
-    restaurant.update({"opened": random.randint(1970,2022)})
-    restaurant.update({"rating": random.randint(1,5)})
-    restaurant.update({"reviews": random.randint(1,1000)})
-    restaurant.update({"pricing": random.choice(RESTAURANT_PRICES)})
-    restaurant.update({"outside_area": random.choice(RESTAURANT_OUTSIDE)})
+    restaurant.update({"Name":f"{type} {name} {random.randint(1,1000)}"})
+    restaurant.update({"City":city})
+    restaurant.update({"Cuisine": type})
+    restaurant.update({"Opened": random.randint(1970,2022)})
+    restaurant.update({"Rating": random.randint(1,5)})
+    restaurant.update({"Reviews": random.randint(1,1000)})
+    restaurant.update({"Pricing": random.choice(RESTAURANT_PRICES)})
+    restaurant.update({"Outside_area": random.choice(RESTAURANT_OUTSIDE)})
     restaurant.update({"location":{"type":"Point", "coordinates":[float(long), float(lat)]}})
     return restaurant
     
@@ -106,7 +103,7 @@ def addRestaurants(city, collection):
     # Calculate radius
     radius = calculateRadius(city)
     # Calculate number of restaurants
-    restaurants_no = 2#ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
+    restaurants_no = 1#ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
     # Create restaurants
     coord = city["location"]["coordinates"]
     for i in range(restaurants_no):
@@ -119,13 +116,13 @@ def addRestaurants(city, collection):
 def addRandomFilterToQuery(query: dict):
     queryType = random.choice(["restaurantType","ratingScore", "outsideGarden", "cheapPlaces"]) # Choose the type of the query
     if queryType == "restaurantType":
-        query["cuisine"] = { "$eq": random.choice(RESTAURANT_TYPES)}
+        query["Cuisine"] = { "$eq": random.choice(RESTAURANT_TYPES)}
     elif queryType == "ratingScore":
-        query["rating"] = { "$gt": random.randint(0,4)}
+        query["Rating"] = { "$gt": random.randint(0,4)}
     elif queryType == "outsideGarden":
-        query["outside_area"] = { "$eq": random.choice([True, False])}
+        query["Outside_area"] = { "$eq": random.choice([True, False])}
     elif queryType == "cheapPlaces":
-        query["pricing"] = { "$eq": random.choice(["$", "$$", "$$$"])}
+        query["Pricing"] = { "$eq": random.choice(["$", "$$", "$$$"])}
     return query
 
 def generateBasicQuery(biggest_cities_data: list):
@@ -166,9 +163,11 @@ def preLoad():
             # Insert
             collection.insert_one(row)
             # Add the restaurants
-            #restaurants_added += addRestaurants(row, collection)
+            restaurants_added += addRestaurants(row, collection)
             # Log from time to time
             loadingStatus += 1
+            if loadingStatus == 5000:
+                break
             if loadingStatus % 5000 == 0:
                 print(f"Loaded {loadingStatus} cities (with {restaurants_added} restaurants)...")
                 preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
@@ -178,12 +177,14 @@ def preLoad():
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
+    preload.write("HEADER, End\n")
+    preload.write("date,time,phase,processName,action,queryID,ifAcknowledged,numberOfResults,insertedID\n")
     preload.close()
     print("Finshed preloading...")
     return 1
 
 
-def startBenchmark(config):
+def startBenchmark():
     print("Starting benchmark...")
     global procs, dirName, finalNumberOfProcesses
     # Create a array of biggest cities
@@ -200,7 +201,7 @@ def startBenchmark(config):
         proc = Process(target=startWorker, args=(id, dirName, biggest_cities_data, ))
         procs.append(proc)
         proc.start()
-        time.sleep(config["new_process_interval"])
+        time.sleep(5)
     # Join all proceses
     time.sleep(30)
     finalNumberOfProcesses = len(procs)
@@ -229,9 +230,9 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
         query = generateBasicQuery(biggest_cities_data)
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
         file.flush()
-        print(f"Process{process_id}: Sending query{queryID}...\n")
+        #print(f"Process{process_id}: Sending query{queryID}...\n")
         response = collection.find(query).limit(10)
-        text = list(response)
+        responseList = list(response)
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
         file.flush()
         queryID += 1  
@@ -246,19 +247,17 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
             query = addRandomFilterToQuery(query)
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
             file.flush()
-            print(f"Process{process_id}: Sending query{queryID}...\n")
+            #print(f"Process{process_id}: Sending query{queryID}...\n")
             response = collection.find(query).limit(10)
-            text = list(response)
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
             file.flush()
             queryID += 1
-        else:
+        elif len(responseList) == 10:
             # Look into next page
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
             file.flush()
-            print(f"Process{process_id}: Sending query{queryID}...\n")
+            #print(f"Process{process_id}: Sending query{queryID}...\n")
             response = collection.find(query).skip(10).limit(10)
-            text = list(response)
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
             file.flush()
             queryID += 1
@@ -284,17 +283,14 @@ def cleanUp():
     return 1
 
 if __name__ == '__main__':
-    # Open the config
-    with open(CONFIG_PATH) as f:
-        config = toml.load(f)
     # Init the logging
-    if (initLogging(config) != 1):
+    if (initLogging() != 1):
         print("ERROR")
     # Start the preload 
-    #if (preLoad() != 1):
-    #    print("ERROR")
+    if (preLoad() != 1):
+        print("ERROR")
     # Start the experiment
-    if (startBenchmark(config) != 1):
+    if (startBenchmark() != 1):
         print("ERROR")
     # Clean-up the benchmark
     if (cleanUp() != 1):

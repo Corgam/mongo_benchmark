@@ -2,6 +2,7 @@ from json import load
 from math import ceil
 from multiprocessing import Process
 from pydoc import resolve
+from sqlite3 import Cursor
 import time, os, shutil, math, random
 import pymongo
 from datetime import datetime
@@ -99,11 +100,17 @@ def calculateRadius(city):
     population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
     return ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
 
+def calculateRestaurantNo(city):
+    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
+    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
+    return ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
+   
+
 def addRestaurants(city, collection):
     # Calculate radius
     radius = calculateRadius(city)
     # Calculate number of restaurants
-    restaurants_no = 1#ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
+    restaurants_no = calculateRestaurantNo(city)
     # Create restaurants
     coord = city["location"]["coordinates"]
     for i in range(restaurants_no):
@@ -166,9 +173,9 @@ def preLoad():
             restaurants_added += addRestaurants(row, collection)
             # Log from time to time
             loadingStatus += 1
-            if loadingStatus == 5000:
+            if loadingStatus == 500:
                 break
-            if loadingStatus % 5000 == 0:
+            if loadingStatus % 100 == 0:
                 print(f"Loaded {loadingStatus} cities (with {restaurants_added} restaurants)...")
                 preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
     print(f"Added in total {restaurants_added} restaurants the the database.")
@@ -197,13 +204,13 @@ def startBenchmark():
             city_data = [float(coordinatesString[1]), float(coordinatesString[0]), radius]
             biggest_cities_data.append(city_data)
     # Creating new processes
-    for id in range(3):
+    for id in range(100):
         proc = Process(target=startWorker, args=(id, dirName, biggest_cities_data, ))
         procs.append(proc)
         proc.start()
         time.sleep(5)
     # Join all proceses
-    time.sleep(30)
+    time.sleep(5*100+10)
     finalNumberOfProcesses = len(procs)
     for proc in procs:
         proc.kill()
@@ -231,9 +238,9 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
         file.flush()
         #print(f"Process{process_id}: Sending query{queryID}...\n")
-        response = collection.find(query).limit(10)
+        response : Cursor = collection.find(query).limit(10)
         responseList = list(response)
-        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
+        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,-\n")
         file.flush()
         queryID += 1  
         # Chance that the query will end
@@ -249,7 +256,7 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
             file.flush()
             #print(f"Process{process_id}: Sending query{queryID}...\n")
             response = collection.find(query).limit(10)
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,-\n")
             file.flush()
             queryID += 1
         elif len(responseList) == 10:
@@ -257,8 +264,8 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
             file.flush()
             #print(f"Process{process_id}: Sending query{queryID}...\n")
-            response = collection.find(query).skip(10).limit(10)
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,{response.count()}\n")
+            response: Cursor = collection.find(query).skip(10).limit(10)
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,-\n")
             file.flush()
             queryID += 1
         

@@ -6,14 +6,14 @@ from datetime import datetime
 from csv import DictReader
 
 # Debug
-DATASET_PATH = "workload_generation/workload.json.gz"
-DATABASE_URL = "mongodb://localhost:27017"
+#DATASET_PATH = "workload_generation/workload.json.gz"
+#DATABASE_URL = "mongodb://localhost:27017"
 # Path variables
 RESULTS_PATH = "/tmp/results.txt"
-#DATASET_PATH = "/tmp/workload.json.gz"
+DATASET_PATH = "/tmp/workload.json.gz"
 DATABASE_NAME = "world"
 COLLECTION_NAME = "restaurants"
-#DATABASE_URL = "mongodb://mongos:27017"
+DATABASE_URL = "mongodb://mongos:27017"
 # Radius variables
 SMALLEST_POPULATION = 1000
 BIGGEST_POPULATION = 22315474

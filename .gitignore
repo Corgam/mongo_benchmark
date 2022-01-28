@@ -1,9 +1,16 @@
-# Additional
+# Results file
 Results*
 Sorted_*
-clientkey*
+
+# Workload
+workload*.json.gz
+
+# Terraform
 deployments/*/terraform*
 deployments/*/.terraform*
 client/*/terraform*
 client/*/.terraform*
+
+# Credentials
 credentials.json
+clientkey*

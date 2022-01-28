@@ -5,6 +5,7 @@ setup:
 	ssh-keygen -f deployments/1Shards/clientkey -P "" -q
 	ssh-keygen -f deployments/2Shards/clientkey -P "" -q
 	ssh-keygen -f deployments/3Shards/clientkey -P "" -q
+	python3 workload_generation/generation.py
 
 mongo:
 	cd deployments/${n}Shards && terraform init

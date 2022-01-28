@@ -44,10 +44,10 @@ resource "google_compute_instance" "benchmarking_client" {
       private_key = file("./clientkey")
     } 
   }
-  # Upload the dataset file
+  # Upload the workload file
   provisioner "file" {
-    source = "data/cities_above_1000.csv"
-    destination = "/tmp/cities_above_1000.csv"
+    source = "../../workload_generation/workload.json.gz"
+    destination = "/tmp/workload.json.gz"
     connection {
       type = "ssh"
       user = "ubuntu"

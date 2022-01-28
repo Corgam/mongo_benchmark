@@ -1,22 +1,19 @@
-from json import load
 from math import ceil
 from multiprocessing import Process
-from pydoc import resolve
 from sqlite3 import Cursor
-import time, os, shutil, math, random
-import pymongo
+import time, os, shutil, math, random, gzip, json, pymongo
 from datetime import datetime
 from csv import DictReader
 
 # Debug
-#DATASET_PATH = "deployments/benchmarking_client/data/cities_above_1000.csv"
-#DATABASE_URL = "mongodb://localhost:27017"
+DATASET_PATH = "workload_generation/workload.json.gz"
+DATABASE_URL = "mongodb://localhost:27017"
 # Path variables
 RESULTS_PATH = "/tmp/results.txt"
-DATASET_PATH = "/tmp/cities_above_1000.csv"
+#DATASET_PATH = "/tmp/workload.json.gz"
 DATABASE_NAME = "world"
 COLLECTION_NAME = "restaurants"
-DATABASE_URL = "mongodb://mongos:27017"
+#DATABASE_URL = "mongodb://mongos:27017"
 # Radius variables
 SMALLEST_POPULATION = 1000
 BIGGEST_POPULATION = 22315474
@@ -44,7 +41,7 @@ def getCurrentTime():
 
 
 def initLogging():
-    print("Starting logging..")
+    print("Starting logging...")
     global results_file, dirName
     # Create the results file
     timeStr = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
@@ -79,46 +76,11 @@ def random_location(lon, lat, max_radius):
     random_lon = lon + dx / ( OneDegree * math.cos(lat * math.pi / 180) )
     return[random_lon, random_lat]
 
-
-def createRestaurantJSON(long, lat, city):
-    restaurant = {}
-    type = random.choice(RESTAURANT_TYPES)
-    name = random.choice(RESTAURANT_NAMES)
-    restaurant.update({"Name":f"{type} {name} {random.randint(1,1000)}"})
-    restaurant.update({"City":city})
-    restaurant.update({"Cuisine": type})
-    restaurant.update({"Opened": random.randint(1970,2022)})
-    restaurant.update({"Rating": random.randint(1,5)})
-    restaurant.update({"Reviews": random.randint(1,1000)})
-    restaurant.update({"Pricing": random.choice(RESTAURANT_PRICES)})
-    restaurant.update({"Outside_area": random.choice(RESTAURANT_OUTSIDE)})
-    restaurant.update({"location":{"type":"Point", "coordinates":[float(long), float(lat)]}})
-    return restaurant
     
 def calculateRadius(city):
     population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
     population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
     return ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
-
-def calculateRestaurantNo(city):
-    population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
-    population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
-    return ceil((population_proc * (BIGGEST_POPULATION_RESTAURANTS - SMALLEST_POPULATION_RESTAURANTS)) + SMALLEST_POPULATION_RESTAURANTS)
-   
-
-def addRestaurants(city, collection):
-    # Calculate radius
-    radius = calculateRadius(city)
-    # Calculate number of restaurants
-    restaurants_no = calculateRestaurantNo(city)
-    # Create restaurants
-    coord = city["location"]["coordinates"]
-    for i in range(restaurants_no):
-        long, lat = random_location(coord[0], coord[1], radius)
-        restaurant = createRestaurantJSON(long, lat, city["Name"])
-        collection.insert_one(restaurant)
-    return restaurants_no
-
 
 def addRandomFilterToQuery(query: dict):
     queryType = random.choice(["restaurantType","ratingScore", "outsideGarden", "cheapPlaces"]) # Choose the type of the query
@@ -148,41 +110,33 @@ def preLoad():
     print("Starting preloading...")
     preload = open(dirName+"/preload.txt", "a")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedPreload\n")
+    # Load the workload
+    print("Opening the workload file...")
+    with gzip.open("workload_generation/workload.json.gz", "rb") as fi:
+        data = fi.read()
+        preload.write(f"{getCurrentTime()},Preload,MainProcess,OpenedWorkloadFile\n")
+        print("Decompressing the workload file...")
+        decopress = gzip.decompress(data)
+        preload.write(f"{getCurrentTime()},Preload,MainProcess,DecompressedTheWorkload\n")
+        print("Loading JSON data...")
+        restaurants_json = json.loads(decopress)
+        preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedJSONData\n")
+    print("Loaded the workload file.")
     # Connect to the mongos
+    print("Connecting to MongoDB...")
     client = pymongo.MongoClient(DATABASE_URL)
     db = client[DATABASE_NAME]
     collection = db[COLLECTION_NAME]
     preload.write(f"{getCurrentTime()},Preload,MainProcess,ConnectedToMongo\n")
-    # Start loading the dataset
-    restaurants_added = 0
-    with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
-        dataset_reader = DictReader(dataset, delimiter=';')
-        # Read every row
-        preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedLoadingDataset\n")
-        loadingStatus = 0
-        for row in dataset_reader:
-            # Prepare coordinates
-            coordinates = row['Coordinates'].split(",")
-             # Inside the dataset, long and lat are switched, so lat is first, long second. We need to switch them arround.
-            location = {"location":{"type":"Point", "coordinates":[float(coordinates[1]), float(coordinates[0])]}} 
-            row.pop("Coordinates")
-            row.update(location)
-            # Insert
-            collection.insert_one(row)
-            # Add the restaurants
-            restaurants_added += addRestaurants(row, collection)
-            # Log from time to time
-            loadingStatus += 1
-            if loadingStatus == 500:
-                break
-            if loadingStatus % 100 == 0:
-                print(f"Loaded {loadingStatus} cities (with {restaurants_added} restaurants)...")
-                preload.write(f"{getCurrentTime()},Preload,MainProcess,LoadedObservations,{loadingStatus}\n")
-    print(f"Added in total {restaurants_added} restaurants the the database.")
+    # Load the restaurants
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedLoadingDataset\n")
+    print("Inserting workload to the database. It might take a while...")
+    collection.insert_many(restaurants_json)
+    print("Finished inserting workload.")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
     # Create an geospatial index
     collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
-    preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
     preload.write("HEADER, End\n")
     preload.write("date,time,phase,processName,action,queryID,ifAcknowledged,numberOfResults,insertedID\n")
@@ -210,7 +164,7 @@ def startBenchmark():
         proc.start()
         time.sleep(5)
     # Join all proceses
-    time.sleep(5*100+10)
+    time.sleep(60)
     finalNumberOfProcesses = len(procs)
     for proc in procs:
         proc.kill()
@@ -290,6 +244,8 @@ def cleanUp():
     return 1
 
 if __name__ == '__main__':
+    # Init the seed
+    random.seed(2022)
     # Init the logging
     if (initLogging() != 1):
         print("ERROR")

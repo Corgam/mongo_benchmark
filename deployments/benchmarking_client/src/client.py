@@ -237,9 +237,10 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
         sendTime = datetime.now()
         try:
             response : Cursor = collection.find(query).limit(10)
-            #responseList = response.fetchall() #list(response) 
-        except:
-            print(f"Connection Timeout: Process{process_id}")
+            responseList = list(response) 
+        except Exception as ex:
+            responseList = []
+            print(f"Connection Timeout: Process{process_id}, {ex}")
             ifExceptionsArrised.set(ifExceptionsArrised.get()+1)
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
         latency = datetime.now() - sendTime
@@ -268,8 +269,10 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             sendTime = datetime.now()
             try:
                 response = collection.find(query).limit(10)
-            except:
-                print(f"Connection Timeout: Process{process_id}")
+                responseList = list(response)
+            except Exception as ex:
+                responseList = []
+                print(f"Connection Timeout: Process{process_id}. {ex}")
                 ifExceptionsArrised.set(ifExceptionsArrised.get()+1)
                 file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
             latency = datetime.now() - sendTime
@@ -283,28 +286,30 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
                 numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
             # Increase the ID
             queryID += 1
-        # elif responseList in locals() or len(responseList) == 10:
-        #     # Look into next page
-        #     file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
-        #     file.flush()
-        #     # Calculate the latency
-        #     sendTime = datetime.now()
-        #     try:
-        #         response: Cursor = collection.find(query).skip(10).limit(10)
-        #     except:
-        #         print(f"Exception Process{process_id}")
-        #         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Exception,{queryID}\n")
-        #     latency = datetime.now() - sendTime
-        #     # Log 
-        #     file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},NextPage,{latency.microseconds}\n")
-        #     file.flush()
-        #     # Increase total requests count
-        #     totalRequests.set(totalRequests.get() + 1)
-        #     # Check if wrong latency
-        #     if latency.seconds > LATENCY_UPPERBOUND:
-        #         numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
-        #     # Increase the ID 
-        #     queryID += 1
+        elif len(responseList) == 10:
+            # Look into next page
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
+            file.flush()
+            # Calculate the latency
+            sendTime = datetime.now()
+            try:
+                response: Cursor = collection.find(query).skip(10).limit(10)
+                responseList = list(response)
+            except Exception as ex:
+                responseList = []
+                print(f"Connection Timeout: Process{process_id}. {ex}")
+                file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
+            latency = datetime.now() - sendTime
+            # Log 
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},NextPage,{latency.microseconds}\n")
+            file.flush()
+            # Increase total requests count
+            totalRequests.set(totalRequests.get() + 1)
+            # Check if wrong latency
+            if latency.seconds > LATENCY_UPPERBOUND:
+                numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+            # Increase the ID 
+            queryID += 1
         
 def cleanUp():
     print("Cleaning up...")

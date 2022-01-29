@@ -1,19 +1,25 @@
 from math import ceil
 from multiprocessing import Process
+import multiprocessing
+from multiprocessing.managers import ValueProxy
 from sqlite3 import Cursor
 import time, os, shutil, math, random, gzip, json, pymongo
 from datetime import datetime
 from csv import DictReader
 
 # Debug
-#DATASET_PATH = "workload_generation/workload.json.gz"
-#DATABASE_URL = "mongodb://localhost:27017"
+# DATASET_PATH = "workload_generation/workload_smallest.json.gz"
+# DATABASE_URL = "mongodb://localhost:27017"
+# CITIES_PATH = "workload_generation/cities_above_1000.csv"
+# RESULTS_PATH = "results.txt"
 # Path variables
-RESULTS_PATH = "/tmp/results.txt"
 DATASET_PATH = "/tmp/workload.json.gz"
+DATABASE_URL = "mongodb://mongos:27017"
+CITIES_PATH = "/tmp/cities_above_1000.csv"
+RESULTS_PATH = "/tmp/results.txt"
+
 DATABASE_NAME = "world"
 COLLECTION_NAME = "restaurants"
-DATABASE_URL = "mongodb://mongos:27017"
 # Radius variables
 SMALLEST_POPULATION = 1000
 BIGGEST_POPULATION = 22315474
@@ -26,9 +32,10 @@ RESTAURANT_TYPES = ["Italian", "French", "Japanese", "Polish", "Sushi", "Fastfoo
 RESTAURANT_NAMES = ["Bar", "Restaurant", "Hotel", "Motel", "Food Truck", "Cafe", "Stand", "Dinner", "Bistro"]
 RESTAURANT_PRICES = ["$", "$$", "$$$"]
 RESTAURANT_OUTSIDE = [True, False]
-# Query probabilities
+# Queries
 PROB_END_QUERYING = 0.2
 PROB_ADDITIONAL_FILTER = 0.6
+LATENCY_UPPERBOUND = 0.1 # In seconds, where 1 milliseconds = 0.001 seconds
 
 # Global variables
 dirName : str = None
@@ -42,7 +49,7 @@ def getCurrentTime():
 
 def initLogging():
     print("Starting logging...")
-    global results_file, dirName
+    global dirName
     # Create the results file
     timeStr = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     dirName = "Results"+timeStr
@@ -112,7 +119,7 @@ def preLoad():
     preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedPreload\n")
     # Load the workload
     print("Opening the workload file...")
-    with gzip.open("workload_generation/workload.json.gz", "rb") as fi:
+    with gzip.open(DATASET_PATH, "rb") as fi:
         data = fi.read()
         preload.write(f"{getCurrentTime()},Preload,MainProcess,OpenedWorkloadFile\n")
         print("Decompressing the workload file...")
@@ -141,38 +148,73 @@ def preLoad():
     preload.write("HEADER, End\n")
     preload.write("date,time,phase,processName,action,queryID,ifAcknowledged,numberOfResults,insertedID\n")
     preload.close()
-    print("Finshed preloading...")
+    print("Finshed preloading.")
     return 1
 
 
 def startBenchmark():
     print("Starting benchmark...")
     global procs, dirName, finalNumberOfProcesses
+    # Start the benchmark logging
+    benchmarkFile = open(dirName+"/benchmark.txt", "a")
+    benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,StartedBenchmarking\n")
+    benchmarkFile.flush()
     # Create a array of biggest cities
     biggest_cities_data = []
-    with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
+    with open(CITIES_PATH,"r",encoding="utf-8") as dataset:
         dataset_reader = DictReader(dataset, delimiter=';')
         for city in dataset_reader:
             coordinatesString = city['Coordinates'].split(",")
             radius = calculateRadius(city)
             city_data = [float(coordinatesString[1]), float(coordinatesString[0]), radius]
             biggest_cities_data.append(city_data)
-    # Creating new processes
-    for id in range(100):
-        proc = Process(target=startWorker, args=(id, dirName, biggest_cities_data, ))
-        procs.append(proc)
-        proc.start()
-        time.sleep(5)
-    # Join all proceses
-    time.sleep(60)
-    finalNumberOfProcesses = len(procs)
-    for proc in procs:
-        proc.kill()
+    # Create a process safe latency value field
+    manager = multiprocessing.Manager()
+    badLatencies = manager.Value('i',0)
+    totalRequests = manager.Value('i',0)
+    latencyNotexceeded= True
+    nextProcessID = 0
+    # Start creating new processes
+    while(latencyNotexceeded):
+        # Create 5 processes
+        for id in range(5):
+            proc = Process(target=startWorker, args=(nextProcessID, dirName, biggest_cities_data, badLatencies, totalRequests ))
+            procs.append(proc)
+            proc.start()
+            nextProcessID += 1
+        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,Created5NewProcesses\n")
+        benchmarkFile.flush()
+        print("New 5 processes added...")
+        # Wait some time
+        time.sleep(60)
+        # Check if latency is ok for 98% of the processes
+        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyCheck\n")
+        benchmarkFile.flush()
+        print("Checking the latency in time interval...")
+        # Check if maximum throughput was achieved
+        if badLatencies.get() / totalRequests.get() > 0.02:
+            print(f"Latency exceeded the upperbound value ({badLatencies.get()}/{totalRequests.get()}), ending...")
+            benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyExceeded,{badLatencies.get()},{totalRequests.get()}\n")
+            # Kill all processes
+            for proc in procs:
+                proc.kill()
+            benchmarkFile.flush()
+            latencyNotexceeded = False
+        else:
+            # Clear the previous numbers
+            print(f"Latency ok (only {badLatencies.get()}/{totalRequests.get()}), continuing...")
+            benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyOk,{badLatencies.get()},{totalRequests.get()}\n")
+            badLatencies.set(0)
+            totalRequests.set(0)
+            benchmarkFile.flush()
+    benchmarkFile.close()
+    # Write the final number of processes
+    finalNumberOfProcesses = nextProcessID - 1
     print("Benchmark has ended...")
     return 1
 
 
-def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
+def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numberOfBadLatencies, totalRequests):
     """
     Single worker thread which connects to the MongoDB and continously sends queries.
     """
@@ -191,11 +233,19 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
         query = generateBasicQuery(biggest_cities_data)
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
         file.flush()
-        #print(f"Process{process_id}: Sending query{queryID}...\n")
+        sendTime = datetime.now()
         response : Cursor = collection.find(query).limit(10)
         responseList = list(response)
-        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,-\n")
+        latency = datetime.now() - sendTime
+        # Log
+        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},{latency.microseconds}\n")
         file.flush()
+        # Increase total requests count
+        totalRequests.set(totalRequests.get() + 1)
+        # Check if wrong latency
+        if latency.seconds > LATENCY_UPPERBOUND:
+            numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+        # Increase the ID
         queryID += 1  
         # Chance that the query will end
         if_enough_querying = True if random.random() < PROB_END_QUERYING else False
@@ -208,26 +258,43 @@ def startWorker(process_id : int, dirName: str, biggest_cities_data: list):
             query = addRandomFilterToQuery(query)
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
             file.flush()
-            #print(f"Process{process_id}: Sending query{queryID}...\n")
+            # Calculate the latency
+            sendTime = datetime.now()
             response = collection.find(query).limit(10)
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,-\n")
+            latency = datetime.now() - sendTime
+            # Log
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},{latency.microseconds}\n")
             file.flush()
+            # Increase total requests count
+            totalRequests.set(totalRequests.get() + 1)
+            # Check if wrong latency
+            if latency.seconds > LATENCY_UPPERBOUND:
+                numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+            # Increase the ID
             queryID += 1
         elif len(responseList) == 10:
             # Look into next page
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
             file.flush()
-            #print(f"Process{process_id}: Sending query{queryID}...\n")
+            # Calculate the latency
+            sendTime = datetime.now()
             response: Cursor = collection.find(query).skip(10).limit(10)
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponseBatch,{queryID},ACK?!,-\n")
+            latency = datetime.now() - sendTime
+            # Log 
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},{latency.microseconds}\n")
             file.flush()
+            # Increase total requests count
+            totalRequests.set(totalRequests.get() + 1)
+            # Check if wrong latency
+            if latency.seconds > LATENCY_UPPERBOUND:
+                numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+            # Increase the ID 
             queryID += 1
         
 def cleanUp():
     print("Cleaning up...")
     # Prepare the list of files
-    # TODO: When copying sort by the time
-    fileNames = [dirName+"/header.txt", dirName+"/preload.txt"]
+    fileNames = [dirName+"/header.txt", dirName+"/preload.txt", dirName+"/benchmark.txt"]
     for i in range(finalNumberOfProcesses):
         fileNames.append(dirName+f"/worker{i}.txt")
     # Create the final result file
@@ -248,13 +315,13 @@ if __name__ == '__main__':
     random.seed(2022)
     # Init the logging
     if (initLogging() != 1):
-        print("ERROR")
+        print("ERROR: Initialization of Logging did not go well!")
     # Start the preload 
     if (preLoad() != 1):
-        print("ERROR")
+        print("ERROR: PreLoading did not go well!")
     # Start the experiment
     if (startBenchmark() != 1):
-        print("ERROR")
+        print("ERROR: Benchmarking did not go well!")
     # Clean-up the benchmark
     if (cleanUp() != 1):
-        print("ERROR")
+        print("ERROR: Cleanup did not go well!")

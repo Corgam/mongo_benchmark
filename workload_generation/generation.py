@@ -11,7 +11,7 @@ BIGGEST_POPULATION = 22315474
 SMALLEST_POPULATION_RADIUS = 1000
 BIGGEST_POPULATION_RADIUS = 44927
 SMALLEST_POPULATION_RESTAURANTS = 2
-BIGGEST_POPULATION_RESTAURANTS = 100000
+BIGGEST_POPULATION_RESTAURANTS = 2000#100000
 # Lists
 RESTAURANT_TYPES = ["Italian", "French", "Japanese", "Polish", "Sushi", "Fastfood", "Home Meals", "Slowfood", "Burgers", "Pizza", "Chinese", "Fushion", "Vegan", "Vegetarian", "Seafood"]
 RESTAURANT_NAMES = ["Bar", "Restaurant", "Hotel", "Motel", "Food Truck", "Cafe", "Stand", "Dinner", "Bistro"]
@@ -111,5 +111,5 @@ restaurants_json = json.dumps(restaurants_data)
 encoded = restaurants_json.encode("utf-8")
 compressed = gzip.compress(encoded)
 print("Started writing data to a file...")
-with gzip.open("workload_generation/workload.json.gz", "wb") as f:
+with gzip.open("workload_generation/workload_smallest.json.gz", "wb") as f:
     f.write(compressed)

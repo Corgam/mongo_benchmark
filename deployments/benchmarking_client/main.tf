@@ -16,7 +16,7 @@ provider "google" {
 
 resource "google_compute_instance" "benchmarking_client" {
   name = "client"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-standard-8"
   allow_stopping_for_update = true
 
   boot_disk {
@@ -46,8 +46,19 @@ resource "google_compute_instance" "benchmarking_client" {
   }
   # Upload the workload file
   provisioner "file" {
-    source = "../../workload_generation/workload.json.gz"
+    source = "../../workload_generation/workload_smallest.json.gz"
     destination = "/tmp/workload.json.gz"
+    connection {
+      type = "ssh"
+      user = "ubuntu"
+      host = self.network_interface[0].access_config[0].nat_ip
+      private_key = file("./clientkey")
+    } 
+  }
+  # Upload the cities database file
+  provisioner "file" {
+    source = "../../workload_generation/cities_above_1000.csv"
+    destination = "/tmp/cities_above_1000.csv"
     connection {
       type = "ssh"
       user = "ubuntu"

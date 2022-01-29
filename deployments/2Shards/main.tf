@@ -17,7 +17,7 @@ provider "google" {
 # Config Server for the MongoDB
 resource "google_compute_instance" "configserver" {
   name = "configserver"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-standard-4"
   allow_stopping_for_update = true
   # Specify the OS image
   boot_disk {
@@ -71,7 +71,7 @@ resource "google_compute_instance" "configserver" {
 # Shard 1 for the MongoDB
 resource "google_compute_instance" "shard1" {
   name = "shard1"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-standard-4"
   allow_stopping_for_update = true
   # Specify the OS image
   boot_disk {
@@ -125,7 +125,7 @@ resource "google_compute_instance" "shard1" {
 # Shard 2 for the MongoDB
 resource "google_compute_instance" "shard2" {
   name = "shard2"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-standard-4"
   allow_stopping_for_update = true
   # Specify the OS image
   boot_disk {
@@ -179,7 +179,7 @@ resource "google_compute_instance" "shard2" {
 # Mongos router
 resource "google_compute_instance" "mongos" {
   name = "mongos"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-standard-4"
   allow_stopping_for_update = true
   # Specify the OS image
   boot_disk {

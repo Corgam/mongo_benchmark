@@ -17,7 +17,7 @@ provider "google" {
 # Config Server for the MongoDB
 resource "google_compute_instance" "mongos" {
   name = "mongos"
-  machine_type = "e2-standard-2"
+  machine_type = "e2-standard-16"
   allow_stopping_for_update = true
   # Specify the OS image
   boot_disk {

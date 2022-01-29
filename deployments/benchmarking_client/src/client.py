@@ -138,9 +138,9 @@ def preLoad():
     # Load the restaurants
     preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedLoadingDataset\n")
     print("Inserting workload to the database. It might take a while...")
-    collection.insert_many(restaurants_json)
-    print("Finished inserting workload.")
-    preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDataset\n")
+    resultInsert = collection.insert_many(restaurants_json, bypass_document_validation=True, ordered=False)
+    print(f"Finished inserting workload. Acknowledged: {resultInsert.acknowledged}")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedLoadingDatasetAcknowledged,{resultInsert.acknowledged}\n")
     # Create an geospatial index
     collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")

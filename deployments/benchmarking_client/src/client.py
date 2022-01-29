@@ -172,19 +172,20 @@ def startBenchmark():
     manager = multiprocessing.Manager()
     badLatencies = manager.Value('i',0)
     totalRequests = manager.Value('i',0)
+    ifExceptionsArrised = manager.Value('i',0)
     latencyNotexceeded= True
     nextProcessID = 0
     # Start creating new processes
     while(latencyNotexceeded):
         # Create 5 processes
         for id in range(20):
-            proc = Process(target=startWorker, args=(nextProcessID, dirName, biggest_cities_data, badLatencies, totalRequests ))
+            proc = Process(target=startWorker, args=(nextProcessID, dirName, biggest_cities_data, badLatencies, totalRequests, ifExceptionsArrised ))
             procs.append(proc)
             proc.start()
             nextProcessID += 1
-        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,CreatedNewProcesses,{nextProcessID - 1}\n")
+        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,CreatedNewProcesses,{nextProcessID}\n")
         benchmarkFile.flush()
-        print(f"New 20 processes added ({nextProcessID - 1} in total)...")
+        print(f"New 20 processes added ({nextProcessID} in total)...")
         # Wait some time
         time.sleep(60)
         # Check if latency is ok for 98% of the processes
@@ -214,7 +215,7 @@ def startBenchmark():
     return 1
 
 
-def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numberOfBadLatencies, totalRequests):
+def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numberOfBadLatencies, totalRequests, ifExceptionsArrised):
     """
     Single worker thread which connects to the MongoDB and continously sends queries.
     """
@@ -234,8 +235,13 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
         file.flush()
         sendTime = datetime.now()
-        response : Cursor = collection.find(query).limit(10)
-        responseList = list(response)
+        try:
+            response : Cursor = collection.find(query).limit(10)
+            #responseList = response.fetchall() #list(response) 
+        except:
+            print(f"Connection Timeout: Process{process_id}")
+            ifExceptionsArrised.set(ifExceptionsArrised.get()+1)
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
         latency = datetime.now() - sendTime
         # Log
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},BasicQuery,{latency.microseconds}\n")
@@ -260,7 +266,12 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             file.flush()
             # Calculate the latency
             sendTime = datetime.now()
-            response = collection.find(query).limit(10)
+            try:
+                response = collection.find(query).limit(10)
+            except:
+                print(f"Connection Timeout: Process{process_id}")
+                ifExceptionsArrised.set(ifExceptionsArrised.get()+1)
+                file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
             latency = datetime.now() - sendTime
             # Log
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},AdditionalFilter,{latency.microseconds}\n")
@@ -272,24 +283,28 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
                 numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
             # Increase the ID
             queryID += 1
-        elif len(responseList) == 10:
-            # Look into next page
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
-            file.flush()
-            # Calculate the latency
-            sendTime = datetime.now()
-            response: Cursor = collection.find(query).skip(10).limit(10)
-            latency = datetime.now() - sendTime
-            # Log 
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},NextPage,{latency.microseconds}\n")
-            file.flush()
-            # Increase total requests count
-            totalRequests.set(totalRequests.get() + 1)
-            # Check if wrong latency
-            if latency.seconds > LATENCY_UPPERBOUND:
-                numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
-            # Increase the ID 
-            queryID += 1
+        # elif responseList in locals() or len(responseList) == 10:
+        #     # Look into next page
+        #     file.write(f"{getCurrentTime()},Benchmark,Process{process_id},SendingQuery,{queryID}\n")
+        #     file.flush()
+        #     # Calculate the latency
+        #     sendTime = datetime.now()
+        #     try:
+        #         response: Cursor = collection.find(query).skip(10).limit(10)
+        #     except:
+        #         print(f"Exception Process{process_id}")
+        #         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Exception,{queryID}\n")
+        #     latency = datetime.now() - sendTime
+        #     # Log 
+        #     file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},NextPage,{latency.microseconds}\n")
+        #     file.flush()
+        #     # Increase total requests count
+        #     totalRequests.set(totalRequests.get() + 1)
+        #     # Check if wrong latency
+        #     if latency.seconds > LATENCY_UPPERBOUND:
+        #         numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+        #     # Increase the ID 
+        #     queryID += 1
         
 def cleanUp():
     print("Cleaning up...")

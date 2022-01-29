@@ -146,7 +146,7 @@ def preLoad():
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
     preload.write("HEADER, End\n")
-    preload.write("date,time,phase,processName,action,queryID,ifAcknowledged,numberOfResults,insertedID\n")
+    preload.write("date,time,phase,processName,action,queryID,typeOfQuery,latency\n")
     preload.close()
     print("Finshed preloading.")
     return 1
@@ -177,14 +177,14 @@ def startBenchmark():
     # Start creating new processes
     while(latencyNotexceeded):
         # Create 5 processes
-        for id in range(5):
+        for id in range(20):
             proc = Process(target=startWorker, args=(nextProcessID, dirName, biggest_cities_data, badLatencies, totalRequests ))
             procs.append(proc)
             proc.start()
             nextProcessID += 1
-        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,Created5NewProcesses\n")
+        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,CreatedNewProcesses,{nextProcessID - 1}\n")
         benchmarkFile.flush()
-        print("New 5 processes added...")
+        print(f"New 20 processes added ({nextProcessID - 1} in total)...")
         # Wait some time
         time.sleep(60)
         # Check if latency is ok for 98% of the processes
@@ -238,7 +238,7 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
         responseList = list(response)
         latency = datetime.now() - sendTime
         # Log
-        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},{latency.microseconds}\n")
+        file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},BasicQuery,{latency.microseconds}\n")
         file.flush()
         # Increase total requests count
         totalRequests.set(totalRequests.get() + 1)
@@ -263,7 +263,7 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             response = collection.find(query).limit(10)
             latency = datetime.now() - sendTime
             # Log
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},{latency.microseconds}\n")
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},AdditionalFilter,{latency.microseconds}\n")
             file.flush()
             # Increase total requests count
             totalRequests.set(totalRequests.get() + 1)
@@ -281,7 +281,7 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             response: Cursor = collection.find(query).skip(10).limit(10)
             latency = datetime.now() - sendTime
             # Log 
-            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},{latency.microseconds}\n")
+            file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},NextPage,{latency.microseconds}\n")
             file.flush()
             # Increase total requests count
             totalRequests.set(totalRequests.get() + 1)

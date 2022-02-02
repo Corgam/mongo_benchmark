@@ -1,7 +1,6 @@
 from math import ceil
 from multiprocessing import Process
 import multiprocessing
-from multiprocessing.managers import ValueProxy
 from sqlite3 import Cursor
 import time, os, shutil, math, random, gzip, json, pymongo
 from datetime import datetime
@@ -41,6 +40,21 @@ LATENCY_UPPERBOUND = 0.1 # In seconds, where 1 milliseconds = 0.001 seconds
 dirName : str = None
 procs = []
 finalNumberOfProcesses = 0
+
+
+class counter_value(object):
+    def __init__(self, initialVal = 0) -> None:
+        self.val: multiprocessing.Value = multiprocessing.Value("i", initialVal)
+        self.lock: multiprocessing.Lock = multiprocessing.Lock()
+    def increment(self):
+        with self.lock:
+            self.val.value += 1
+    def set_value(self, new_val):
+        with self.lock:
+            self.val.value = new_val
+    def get_value(self):
+        with self.lock:
+            return self.val.value
 
 
 def getCurrentTime():
@@ -170,9 +184,9 @@ def startBenchmark():
             biggest_cities_data.append(city_data)
     # Create a process safe latency value field
     manager = multiprocessing.Manager()
-    badLatencies = manager.Value('i',0)
-    totalRequests = manager.Value('i',0)
-    ifExceptionsArrised = manager.Value('i',0)
+    badLatencies = counter_value(0)
+    totalRequests = counter_value(0)
+    ifExceptionsArrised = counter_value(0)
     latencyNotexceeded= True
     nextProcessID = 0
     # Start creating new processes
@@ -193,9 +207,9 @@ def startBenchmark():
         benchmarkFile.flush()
         print("Checking the latency in time interval...")
         # Check if maximum throughput was achieved
-        if badLatencies.get() / totalRequests.get() > 0.02:
-            print(f"Latency exceeded the upperbound value ({badLatencies.get()}/{totalRequests.get()}), ending...")
-            benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyExceeded,{badLatencies.get()},{totalRequests.get()}\n")
+        if totalRequests.get_value() == 0 or badLatencies.get_value() / totalRequests.get_value() > 0.02:
+            print(f"Latency exceeded the upperbound value ({badLatencies.get_value()}/{totalRequests.get_value()}), ending...")
+            benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyExceeded,{badLatencies.get_value()},{totalRequests.get_value()}\n")
             # Kill all processes
             for proc in procs:
                 proc.kill()
@@ -203,10 +217,10 @@ def startBenchmark():
             latencyNotexceeded = False
         else:
             # Clear the previous numbers
-            print(f"Latency ok (only {badLatencies.get()}/{totalRequests.get()}), continuing...")
-            benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyOk,{badLatencies.get()},{totalRequests.get()}\n")
-            badLatencies.set(0)
-            totalRequests.set(0)
+            print(f"Latency ok (only {badLatencies.get_value()}/{totalRequests.get_value()}), continuing...")
+            benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyOk,{badLatencies.get_value()},{totalRequests.get_value()}\n")
+            badLatencies.set_value(0)
+            totalRequests.set_value(0)
             benchmarkFile.flush()
     benchmarkFile.close()
     # Write the final number of processes
@@ -215,7 +229,7 @@ def startBenchmark():
     return 1
 
 
-def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numberOfBadLatencies, totalRequests, ifExceptionsArrised):
+def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numberOfBadLatencies: counter_value, totalRequests: counter_value, ifExceptionsArrised: counter_value):
     """
     Single worker thread which connects to the MongoDB and continously sends queries.
     """
@@ -241,17 +255,17 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
         except Exception as ex:
             responseList = []
             print(f"Connection Timeout: Process{process_id}, {ex}")
-            ifExceptionsArrised.set(ifExceptionsArrised.get()+1)
+            ifExceptionsArrised.increment()
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
         latency = datetime.now() - sendTime
         # Log
         file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},BasicQuery,{latency.microseconds}\n")
         file.flush()
         # Increase total requests count
-        totalRequests.set(totalRequests.get() + 1)
+        totalRequests.increment()
         # Check if wrong latency
         if latency.seconds > LATENCY_UPPERBOUND:
-            numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+            numberOfBadLatencies.increment()
         # Increase the ID
         queryID += 1  
         # Chance that the query will end
@@ -273,17 +287,17 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             except Exception as ex:
                 responseList = []
                 print(f"Connection Timeout: Process{process_id}. {ex}")
-                ifExceptionsArrised.set(ifExceptionsArrised.get()+1)
+                ifExceptionsArrised.increment()
                 file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
             latency = datetime.now() - sendTime
             # Log
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},AdditionalFilter,{latency.microseconds}\n")
             file.flush()
             # Increase total requests count
-            totalRequests.set(totalRequests.get() + 1)
+            totalRequests.increment()
             # Check if wrong latency
             if latency.seconds > LATENCY_UPPERBOUND:
-                numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+                numberOfBadLatencies.increment()
             # Increase the ID
             queryID += 1
         elif len(responseList) == 10:
@@ -298,16 +312,17 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             except Exception as ex:
                 responseList = []
                 print(f"Connection Timeout: Process{process_id}. {ex}")
+                ifExceptionsArrised.increment()
                 file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Timeout,{queryID}\n")
             latency = datetime.now() - sendTime
             # Log 
             file.write(f"{getCurrentTime()},Benchmark,Process{process_id},ReceivedResponse,{queryID},NextPage,{latency.microseconds}\n")
             file.flush()
             # Increase total requests count
-            totalRequests.set(totalRequests.get() + 1)
+            totalRequests.increment()
             # Check if wrong latency
             if latency.seconds > LATENCY_UPPERBOUND:
-                numberOfBadLatencies.set(numberOfBadLatencies.get() + 1)
+                numberOfBadLatencies.increment()
             # Increase the ID 
             queryID += 1
         

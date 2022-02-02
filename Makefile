@@ -1,4 +1,4 @@
-.PHONY: setup mongo benchmark clean
+.PHONY: setup mongo benchmark clean	
 
 setup:
 	ssh-keygen -f deployments/benchmarking_client/clientkey -P "" -q
@@ -8,6 +8,7 @@ setup:
 	python3 workload_generation/generation.py
 
 mongo:
+	$(file > number_of_shards_in_last_run.txt,$(n))
 	cd deployments/${n}Shards && terraform init
 	cd deployments/${n}Shards && terraform apply -auto-approve
 

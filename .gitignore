@@ -1,6 +1,7 @@
 # Results file
 Results*
 Sorted_*
+number_of_shards_in_last_run.txt
 
 # Workload
 workload*.json.gz

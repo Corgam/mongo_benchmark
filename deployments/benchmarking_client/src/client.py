@@ -192,6 +192,8 @@ def startBenchmark():
     # Start creating new processes
     while(latencyNotexceeded):
         # Create 5 processes
+        benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,AddingMoreProcesses,nextProcessID\n")
+        benchmarkFile.flush()
         for id in range(20):
             proc = Process(target=startWorker, args=(nextProcessID, dirName, biggest_cities_data, badLatencies, totalRequests, ifExceptionsArrised ))
             procs.append(proc)

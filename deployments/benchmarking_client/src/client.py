@@ -61,24 +61,6 @@ def getCurrentTime():
     return datetime.now().strftime("%d/%m/%Y,%H:%M:%S.%f")
 
 
-def initLogging():
-    print("Starting logging...")
-    global dirName
-    # Create the results file
-    timeStr = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    dirName = "Results"+timeStr
-    # dirName = "Results"+ str(config["benchmark_run_id"]) +"_Shards"+ str(config["number_of_mongo_shards"]) +"_"+timeStr
-    os.makedirs(dirName, exist_ok=True)
-    header = open(dirName+"/header.txt", "a")
-    # Add header
-    header.write("HEADER, Start\n")
-    #header.write("Benchmark id, "+ str(config["benchmark_run_id"]) +"\n")
-    #header.write("Number of MongoDB shards, "+ str(config["number_of_mongo_shards"]) +"\n")
-    header.write("Time of benchmark, "+ timeStr+"\n")
-    header.close()
-    return 1
-    
-
 def random_point_in_disk(max_radius):
     # Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
     radius = random.uniform(0,max_radius)
@@ -129,7 +111,13 @@ def generateBasicQuery(biggest_cities_data: list):
 
 def preLoad():
     print("Starting preloading...")
+    global dirName
+    # Create the results file
+    timeStr = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    dirName = "Results"+timeStr
+    os.makedirs(dirName, exist_ok=True)
     preload = open(dirName+"/preload.txt", "a")
+    preload.write("PRELOAD, Start\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,StartedPreload\n")
     # Load the workload
     print("Opening the workload file...")
@@ -159,7 +147,7 @@ def preLoad():
     collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
-    preload.write("HEADER, End\n")
+    preload.write("PRELOAD, End\n")
     preload.write("date,time,phase,processName,action,queryID,typeOfQuery,latency\n")
     preload.close()
     print("Finshed preloading.")
@@ -183,7 +171,6 @@ def startBenchmark():
             city_data = [float(coordinatesString[1]), float(coordinatesString[0]), radius]
             biggest_cities_data.append(city_data)
     # Create a process safe latency value field
-    manager = multiprocessing.Manager()
     badLatencies = counter_value(0)
     totalRequests = counter_value(0)
     ifExceptionsArrised = counter_value(0)
@@ -331,7 +318,7 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
 def cleanUp():
     print("Cleaning up...")
     # Prepare the list of files
-    fileNames = [dirName+"/header.txt", dirName+"/preload.txt", dirName+"/benchmark.txt"]
+    fileNames = [dirName+"/preload.txt", dirName+"/benchmark.txt"]
     for i in range(finalNumberOfProcesses):
         fileNames.append(dirName+f"/worker{i}.txt")
     # Create the final result file
@@ -350,9 +337,6 @@ def cleanUp():
 if __name__ == '__main__':
     # Init the seed
     random.seed(2022)
-    # Init the logging
-    if (initLogging() != 1):
-        print("ERROR: Initialization of Logging did not go well!")
     # Start the preload 
     if (preLoad() != 1):
         print("ERROR: PreLoading did not go well!")

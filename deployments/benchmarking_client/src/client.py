@@ -6,6 +6,10 @@ import time, os, shutil, math, random, gzip, json, pymongo
 from datetime import datetime
 from csv import DictReader
 
+# Latency checks options
+PROCESSES_PER_ITERATION = 20
+WAIT_TIME_PER_ITERATION = 60 # in seconds
+UPPER_CLIENT_PROCESSES_LIMIT = 4000
 # Debug
 # DATASET_PATH = "workload_generation/workload_smallest.json.gz"
 # DATABASE_URL = "mongodb://localhost:27017"
@@ -35,7 +39,6 @@ RESTAURANT_OUTSIDE = [True, False]
 PROB_END_QUERYING = 0.2
 PROB_ADDITIONAL_FILTER = 0.6
 LATENCY_UPPERBOUND = 0.1 # In seconds, where 1 milliseconds = 0.001 seconds
-
 # Global variables
 dirName : str = None
 procs = []
@@ -133,7 +136,7 @@ def preLoad():
     print("Loaded the workload file.")
     # Connect to the mongos
     print("Connecting to MongoDB...")
-    client = pymongo.MongoClient(DATABASE_URL)
+    client = pymongo.MongoClient(DATABASE_URL, serverSelectionTimeoutMS=1000*500)
     db = client[DATABASE_NAME]
     collection = db[COLLECTION_NAME]
     preload.write(f"{getCurrentTime()},Preload,MainProcess,ConnectedToMongo\n")
@@ -147,6 +150,10 @@ def preLoad():
     collection.create_index([("location",pymongo.GEOSPHERE)])
     preload.write(f"{getCurrentTime()},Preload,MainProcess,CreatedIndex,2dsphere\n")
     preload.write(f"{getCurrentTime()},Preload,MainProcess,FinishedPreload\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,StartringBenchmarkWithOptions\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,ClientProcessesPerIterationOption,{PROCESSES_PER_ITERATION}\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,WaitTimePerIterationOption,{WAIT_TIME_PER_ITERATION}\n")
+    preload.write(f"{getCurrentTime()},Preload,MainProcess,UpperClientProcessesLimitOption,{UPPER_CLIENT_PROCESSES_LIMIT}\n")
     preload.write("PRELOAD, End\n")
     preload.write("date,time,phase,processName,action,queryID,typeOfQuery,latency\n")
     preload.close()
@@ -176,27 +183,28 @@ def startBenchmark():
     ifExceptionsArrised = counter_value(0)
     latencyNotexceeded= True
     nextProcessID = 0
+    # Parameters
     # Start creating new processes
     while(latencyNotexceeded):
-        # Create 5 processes
+        # Create new processes
         benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,AddingMoreProcesses,{nextProcessID}\n")
         benchmarkFile.flush()
-        for id in range(20):
+        for id in range(PROCESSES_PER_ITERATION):
             proc = Process(target=startWorker, args=(nextProcessID, dirName, biggest_cities_data, badLatencies, totalRequests, ifExceptionsArrised ))
             procs.append(proc)
             proc.start()
             nextProcessID += 1
         benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,CreatedNewProcesses,{nextProcessID}\n")
         benchmarkFile.flush()
-        print(f"New 20 processes added ({nextProcessID} in total)...")
+        print(f"New {PROCESSES_PER_ITERATION} processes added ({nextProcessID} in total)...")
         # Wait some time
-        time.sleep(60)
+        time.sleep(WAIT_TIME_PER_ITERATION)
         # Check if latency is ok for 98% of the processes
         benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyCheck\n")
         benchmarkFile.flush()
         print("Checking the latency in time interval...")
         # Check if maximum throughput was achieved
-        if totalRequests.get_value() == 0 or badLatencies.get_value() / totalRequests.get_value() > 0.02:
+        if nextProcessID > UPPER_CLIENT_PROCESSES_LIMIT or totalRequests.get_value() == 0 or badLatencies.get_value() / totalRequests.get_value() > 0.02:
             print(f"Latency exceeded the upperbound value ({badLatencies.get_value()}/{totalRequests.get_value()}), ending...")
             benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyExceeded,{badLatencies.get_value()},{totalRequests.get_value()}\n")
             # Kill all processes
@@ -227,7 +235,7 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
     file.write(f"{getCurrentTime()},Benchmark,Process{process_id},Created\n")
     file.flush()
     # Connect to the database
-    client = pymongo.MongoClient(DATABASE_URL)
+    client = pymongo.MongoClient(DATABASE_URL, serverSelectionTimeoutMS=1000*500)
     db = client[DATABASE_NAME]
     collection = db[COLLECTION_NAME]
     # Start sending the queries

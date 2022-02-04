@@ -8,7 +8,7 @@ with open("header.txt", "a") as header:
     header.truncate(0)
     header.write("HEADER, Start\n")
     timeStr = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-    header.write("TimeOfBenchmark, "+ timeStr+"\n")
+    header.write("TimeOfBenchmark,"+ timeStr+"\n")
     with open("number_of_shards_in_last_run.txt", "r", encoding="utf-8") as f:
         number_of_shards = int(f.read())
         header.write(f"NumberOfShards,{number_of_shards}\n")

@@ -3,6 +3,7 @@ Results*
 Sorted_*
 number_of_shards_in_last_run.txt
 id_of_last_run_benchmark.txt
+header.txt
 
 # Workload
 workload*.json.gz

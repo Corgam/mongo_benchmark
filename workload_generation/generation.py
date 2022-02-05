@@ -11,7 +11,7 @@ BIGGEST_POPULATION = 22315474
 SMALLEST_POPULATION_RADIUS = 1000
 BIGGEST_POPULATION_RADIUS = 44927
 SMALLEST_POPULATION_RESTAURANTS = 2
-BIGGEST_POPULATION_RESTAURANTS = 2000#100000
+BIGGEST_POPULATION_RESTAURANTS = 100000 #Choose smaller number for smaller workload, for example: 2000
 # Lists
 RESTAURANT_TYPES = ["Italian", "French", "Japanese", "Polish", "Sushi", "Fastfood", "Home Meals", "Slowfood", "Burgers", "Pizza", "Chinese", "Fushion", "Vegan", "Vegetarian", "Seafood"]
 RESTAURANT_NAMES = ["Bar", "Restaurant", "Hotel", "Motel", "Food Truck", "Cafe", "Stand", "Dinner", "Bistro"]
@@ -98,9 +98,6 @@ with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
         # Add the restaurants
         addRestaurants(row)
         loadingStatus = loadingStatus +1
-        # Uncomment the lines below to generate restaurants for smaller number of cities (smaller size of workload file).
-        # if loadingStatus == 5000:
-        #     break
         if loadingStatus % 10000 == 0:
             print(f"Genereted restaurants for {loadingStatus} cities.")
 
@@ -111,5 +108,5 @@ restaurants_json = json.dumps(restaurants_data)
 encoded = restaurants_json.encode("utf-8")
 compressed = gzip.compress(encoded)
 print("Started writing data to a file...")
-with gzip.open("workload_generation/workload_smallest.json.gz", "wb") as f:
+with gzip.open("workload_generation/workload.json.gz", "wb") as f:
     f.write(compressed)

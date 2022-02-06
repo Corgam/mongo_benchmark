@@ -7,14 +7,21 @@ This is a repository containing a MongoDB Database Benchmark, done for Cloud Ser
 
 In more detail, we compare the maximum throughputs for MongoDB Databases containing geospatial data. Three scenarios and thus architectures of MongoDB databases will be compared: without sharding, with 2 shards, and with 3 shards. 
 
-## Implementation 
+More about the benchmark itself, SUT and background information, exact implementation details and results analysis can be read in the Benchmark Report (soon to come!).
+
+## Implementation
 When a benchmark is run, with the use of Terraform, firstly all necessary VMs for the database itself will be deployed on GCP, then benchmarking client will be also deployed on its own VM. The database will be preloaded with the previously generated geospatial workload, and from the start of the benchmark, queried with generated "on the go", geospatial queries. 
 
 Every 30 seconds, 5 new client processes will be created on the benchmarking client, thus simulating the increase of the database reads. Additionally, after every 30 seconds, the latency will be checked for all sent requests during that period. If the latency is exceeded for 2% of the requests, or timeout happens the benchmark will end.
 
 Results file containing the logs made throughout the whole benchmark will be sent back to the host VM executing the benchmark. The results can be analyzed using the Jupyter Notebooks in the `data_analysis` folder.
 
-Exact details on how to execute the benchmark yourself can be found below in the `Execution` section. Good luck!
+Exact details on how to execute the benchmark yourself can be found below in the `Execution` section.
+
+## Results
+
+The results of the Benchmark, including all plots can be seen in the Benchmark Report (soon to come!).
+The plots based on the results can be also seen in the `plots` folder.
 
 # Execution
 

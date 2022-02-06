@@ -2,9 +2,8 @@
 
 This is a repository containing a MongoDB Database Benchmark, done for Cloud Service Benchmarking [WiSe2122] course at TU Berlin. The goal of the Benchmark is to answer the following research question:
 
-```
-RQ 1: How does the maximum throughput change while scaling out the MongoDB database containing geospatial workload?
-```
+***RQ 1: How does the maximum throughput change while scaling out the MongoDB database containing geospatial workload?***
+
 
 In more detail, we compare the maximum throughputs for MongoDB Databases containing geospatial data. Three scenarios and thus architectures of MongoDB databases will be compared: without sharding, with 2 shards, and with 3 shards. 
 

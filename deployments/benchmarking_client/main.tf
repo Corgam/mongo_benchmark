@@ -46,7 +46,7 @@ resource "google_compute_instance" "benchmarking_client" {
   }
   # Upload the workload file
   provisioner "file" {
-    source = "../../workload_generation/workload_smallest.json.gz"
+    source = "../../workload_generation/workload.json.gz"
     destination = "/tmp/workload.json.gz"
     connection {
       type = "ssh"

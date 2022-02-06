@@ -7,9 +7,9 @@ from datetime import datetime
 from csv import DictReader
 
 # Latency checks options
-PROCESSES_PER_ITERATION = 20
-WAIT_TIME_PER_ITERATION = 60 # in seconds
-UPPER_CLIENT_PROCESSES_LIMIT = 4000
+PROCESSES_PER_ITERATION = 5
+WAIT_TIME_PER_ITERATION = 30 # in seconds
+UPPER_CLIENT_PROCESSES_LIMIT = 40000
 # Debug
 # DATASET_PATH = "workload_generation/workload_smallest.json.gz"
 # DATABASE_URL = "mongodb://localhost:27017"
@@ -204,7 +204,7 @@ def startBenchmark():
         benchmarkFile.flush()
         print("Checking the latency in time interval...")
         # Check if maximum throughput was achieved
-        if nextProcessID > UPPER_CLIENT_PROCESSES_LIMIT or totalRequests.get_value() == 0 or badLatencies.get_value() / totalRequests.get_value() > 0.02:
+        if nextProcessID > UPPER_CLIENT_PROCESSES_LIMIT or ifExceptionsArrised.get_value() > 0 or totalRequests.get_value() == 0 or badLatencies.get_value() / totalRequests.get_value() > 0.02:
             print(f"Latency exceeded the upperbound value ({badLatencies.get_value()}/{totalRequests.get_value()}), ending...")
             benchmarkFile.write(f"{getCurrentTime()},Benchmark,MainProcess,LatencyExceeded,{badLatencies.get_value()},{totalRequests.get_value()}\n")
             # Kill all processes

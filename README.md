@@ -21,7 +21,7 @@ Exact details on how to execute the benchmark yourself can be found below in the
 ## Results
 
 The results of the Benchmark, including all plots can be seen in the Benchmark Report (soon to come!).
-The plots based on the results can be also seen in the `plots` folder.
+The plots based on the results can be also seen in the `figures` folder.
 
 # Execution
 

@@ -7,15 +7,11 @@ from datetime import datetime
 from csv import DictReader
 
 # Latency checks options
-PROCESSES_PER_ITERATION = 5
-WAIT_TIME_PER_ITERATION = 30 # in seconds
-UPPER_CLIENT_PROCESSES_LIMIT = 40000
-# Debug
-# DATASET_PATH = "workload_generation/workload_smallest.json.gz"
-# DATABASE_URL = "mongodb://localhost:27017"
-# CITIES_PATH = "workload_generation/cities_above_1000.csv"
-# RESULTS_PATH = "results.txt"
-# Path variables
+PROCESSES_PER_ITERATION = 1 # How many client processes are added every time step.
+WAIT_TIME_PER_ITERATION = 30 # How much time in seconds does the main process wait before latency check. 
+UPPER_CLIENT_PROCESSES_LIMIT = 40 # The upper limit of client processes.
+
+# Path and general variables
 DATASET_PATH = "/tmp/workload.json.gz"
 DATABASE_URL = "mongodb://mongos:27017"
 CITIES_PATH = "/tmp/cities_above_1000.csv"
@@ -23,29 +19,33 @@ RESULTS_PATH = "/tmp/results.txt"
 
 DATABASE_NAME = "world"
 COLLECTION_NAME = "restaurants"
-# Radius variables
+# Radius variables, used for generation of coordinates
 SMALLEST_POPULATION = 1000
 BIGGEST_POPULATION = 22315474
 SMALLEST_POPULATION_RADIUS = 1000
 BIGGEST_POPULATION_RADIUS = 44927
 SMALLEST_POPULATION_RESTAURANTS = 2
 BIGGEST_POPULATION_RESTAURANTS = 100000
-# Lists
+# Lists for query generation
 RESTAURANT_TYPES = ["Italian", "French", "Japanese", "Polish", "Sushi", "Fastfood", "Home Meals", "Slowfood", "Burgers", "Pizza", "Chinese", "Fushion", "Vegan", "Vegetarian", "Seafood"]
 RESTAURANT_NAMES = ["Bar", "Restaurant", "Hotel", "Motel", "Food Truck", "Cafe", "Stand", "Dinner", "Bistro"]
 RESTAURANT_PRICES = ["$", "$$", "$$$"]
 RESTAURANT_OUTSIDE = [True, False]
 # Queries
-PROB_END_QUERYING = 0.2
-PROB_ADDITIONAL_FILTER = 0.6
-LATENCY_UPPERBOUND = 0.1 # In seconds, where 1 milliseconds = 0.001 seconds
+PROB_END_QUERYING = 0.2 # Probability of ending the query after first response.
+PROB_ADDITIONAL_FILTER = 0.6 # Probability of adding additional filtering to basic query.
+LATENCY_UPPERBOUND = 0.1 # What is the max. latency. In seconds, where 1 milliseconds = 0.001 seconds
 # Global variables
-dirName : str = None
-procs = []
-finalNumberOfProcesses = 0
+dirName : str = None # The main name of the results folder
+procs = [] # List of all currently running processes
+finalNumberOfProcesses = 0 # Used for clean-up phase.
 
 
 class counter_value(object):
+    """
+    Creates multiprocess safe couter object, which holds an int value.
+    The value can be changed or just incremented by one.
+    """
     def __init__(self, initialVal = 0) -> None:
         self.val: multiprocessing.Value = multiprocessing.Value("i", initialVal)
         self.lock: multiprocessing.Lock = multiprocessing.Lock()
@@ -61,11 +61,17 @@ class counter_value(object):
 
 
 def getCurrentTime():
+    """
+    Returns a formated, current time.
+    """
     return datetime.now().strftime("%d/%m/%Y,%H:%M:%S.%f")
 
 
 def random_point_in_disk(max_radius):
-    # Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
+    """
+    Generates a random point in the disk with given radius.
+    Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
+    """
     radius = random.uniform(0,max_radius)
     radians = random.uniform(0, 2*math.pi)
     x = radius * math.cos(radians)
@@ -74,7 +80,11 @@ def random_point_in_disk(max_radius):
 
 
 def random_location(lon, lat, max_radius):
-    # Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
+    """
+    Generates a random coordinates pair within a specified circle with given radius and centre coordinate.
+    The centre of the circle is given as longitude and latitude pair.
+    Source: Source: https://stackoverflow.com/questions/43195899/how-to-generate-random-coordinates-within-a-circle-with-specified-radius
+    """
     EarthRadius = 6371
     OneDegree = EarthRadius * 2 * math.pi / 360 * 1000 # 1° latitude in meters
     dx, dy = random_point_in_disk(max_radius)
@@ -84,11 +94,18 @@ def random_location(lon, lat, max_radius):
 
     
 def calculateRadius(city):
+    """
+    Calculates a radius for a given city using hardcoded boundary values.
+    """
     population = int(city["Population"]) if int(city["Population"]) != 0 else 1000
     population_proc = ((population - SMALLEST_POPULATION)) / (BIGGEST_POPULATION - SMALLEST_POPULATION)
     return ceil((population_proc * (BIGGEST_POPULATION_RADIUS - SMALLEST_POPULATION_RADIUS)) + SMALLEST_POPULATION_RADIUS)
 
 def addRandomFilterToQuery(query: dict):
+    """
+    Appends an additional filter to basic quary.
+    Filter options: specific cuisine, rating score, pricing or if the restaurant has outside area.
+    """
     queryType = random.choice(["restaurantType","ratingScore", "outsideGarden", "cheapPlaces"]) # Choose the type of the query
     if queryType == "restaurantType":
         query["Cuisine"] = { "$eq": random.choice(RESTAURANT_TYPES)}
@@ -102,7 +119,7 @@ def addRandomFilterToQuery(query: dict):
 
 def generateBasicQuery(biggest_cities_data: list):
     """
-    Generates a query for the database.
+    Generates a query for the database, with the use of random city in the biggest cities dataset.
     """
     meters = random.randint(5000,50000) # Choose the search radius: from 5km to 50km
     random_city = random.choice(biggest_cities_data) # Choose one of the biggest cities
@@ -113,6 +130,10 @@ def generateBasicQuery(biggest_cities_data: list):
 
 
 def preLoad():
+    """
+    Starts a preload phase, by loading the database with initial workload.
+    Logs all preload actions.
+    """
     print("Starting preloading...")
     global dirName
     # Create the results file
@@ -162,6 +183,11 @@ def preLoad():
 
 
 def startBenchmark():
+    """
+    Main start of the benchmarking phase. Creates X processes every Y seconds and does latency check-ups. Also,
+    keeps track of all created processes, as well as all multiprocess safe values.
+    Stops the benchmark, when 2% of latencies exceeded the set value, or if there is at least one timeout.
+    """
     print("Starting benchmark...")
     global procs, dirName, finalNumberOfProcesses
     # Start the benchmark logging
@@ -324,6 +350,9 @@ def startWorker(process_id: int, dirName: str , biggest_cities_data: list , numb
             queryID += 1
         
 def cleanUp():
+    """
+    Clean up phase, loads up all seperate results files and copies them into one file.
+    """
     print("Cleaning up...")
     # Prepare the list of files
     fileNames = [dirName+"/preload.txt", dirName+"/benchmark.txt"]
@@ -343,6 +372,9 @@ def cleanUp():
     return 1
 
 if __name__ == '__main__':
+    """
+    The main pipeline of the benchmark.
+    """
     # Init the seed
     random.seed(2022)
     # Start the preload 

@@ -53,4 +53,4 @@ Before running the benchmark, make sure that all Mongo's VMs are ready to be use
 
 1. The results file should be located in the root directory of this repository. (named: `Results_[TIME].txt`).
 2. Run `sudo make clean` to destroy all VMs on GCP.
-3. To analyze the results, one can use the Jupyter Notebooks located in the `data_analysis` folder.
+3. To analyze the results, one can use the Jupyter Notebooks located in the `data_analysis` folder. (The packages used in the Jupyter Notebooks will not be installed automaticaly. One needs to download them themself.)

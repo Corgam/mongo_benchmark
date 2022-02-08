@@ -28,10 +28,11 @@ The plots based on the results can be also seen in the `figures` folder.
 ### 1. Requirements and setup
 
 1. Log into your GCP account and create a new project called `mongodb-benchmark`. Use this project for further instructions.
-2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-2 VM with default Ubuntu 20.04 LTS, no guarantees are given for other host types of VMs or OS)
-3. Download the Git (`sudo apt-get install git`) and clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
-4. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where this `README.md` and `Makefile` are)
-5. Run the `make setup` to install all necessary applications, create SSH keys and generate the workload.
+2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-4 VM with default Ubuntu 20.04 LTS, no guarantees are given for other types of VMs (some might have problem with the lack of resources to generate the workload) or the OS)
+3. Download all necessary packages: `sudo apt-get install git make pip3`. 
+4. Clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
+5. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where this `README.md` and `Makefile` are)
+6. Inside of the repo's root folder, run the `sudo make setup` to create the required SSH keys, generate the workload and download all necessary Python packages.
 (The workload size can be changed in the `workload_generation/generation.py` file. Change the `BIGGEST_POPULATION_RESTAURANTS` global constant, to change the possible maximum amount of restaurants per city)
 
 ### 2. Setting up MongoDB

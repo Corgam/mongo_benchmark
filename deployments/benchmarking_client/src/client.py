@@ -7,9 +7,9 @@ from datetime import datetime
 from csv import DictReader
 
 # Latency checks options
-PROCESSES_PER_ITERATION = 1 # How many client processes are added every time step.
-WAIT_TIME_PER_ITERATION = 30 # How much time in seconds does the main process wait before latency check. 
-UPPER_CLIENT_PROCESSES_LIMIT = 40 # The upper limit of client processes.
+PROCESSES_PER_ITERATION = 5 # How many client processes are added every time step.
+WAIT_TIME_PER_ITERATION = 60 # How much time in seconds does the main process wait before latency check. 
+UPPER_CLIENT_PROCESSES_LIMIT = 40000 # The upper limit of client processes.
 
 # Path and general variables
 DATASET_PATH = "/tmp/workload.json.gz"

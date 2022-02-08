@@ -83,7 +83,7 @@ def addRestaurants(city):
         restaurants_data.append(restaurant)
 
 # Generate the restaurants
-print("Started generating the workload...")
+print("Started generating the workload (for up to 140 000 cities)...")
 with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
     dataset_reader = DictReader(dataset, delimiter=';')
     # Read every row

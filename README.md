@@ -27,29 +27,30 @@ The plots based on the results can be also seen in the `figures` folder.
 
 ### 1. Requirements and setup
 
-1. Log into your GCP account and create a new project called `mongodb-benchmark`. Use this project for further instructions.
-2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-8 VM with default Ubuntu 20.04 LTS, no guarantees are given for other types of VMs (some might have problem with the lack of resources to generate the workload) or the OS) If the host VM stops generating the workload, it requires more RAM.
+1. Log into your GCP account and create a new project called `mongodb-benchmark`. Use this project for further instructions. Additionaly, the account should have a minimum resource quota of total CPUs of 60.
+2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-8 VM with default Ubuntu 20.04 LTS, no guarantees are given for other types of VMs (some might have problem with the lack of resources to generate the workload) or the OS) If the host VM stops generating the workload, it probably requires more RAM, in that case one can simply download an already generated workload: .
 3. Download all necessary packages: run `sudo apt-get update` and then `sudo apt-get install git make`. 
-4. Clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
-5. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where this `README.md` and `Makefile` are)
-6. Inside of the repo's root folder, run the `sudo make setup` to create the required SSH keys, generate the workload and download all necessary Python packages.
+4. Install terraform for Linux (follow: https://learn.hashicorp.com/tutorials/terraform/install-cli)
+5. Clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
+6. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where this `README.md` and `Makefile` are)
+7. Inside of the repo's root folder, run the `sudo make setup` to create the required SSH keys, generate the workload and download all necessary Python packages.
 (The workload size can be changed in the `workload_generation/generation.py` file. Change the `BIGGEST_POPULATION_RESTAURANTS` global constant, to change the possible maximum amount of restaurants per city)
 
 ### 2. Setting up MongoDB
 
-1. Run `make mongo n=SHARDS_NUMBER` command to create MongoDB's VMs on GCP, with `n` equal to the number of shards the Mongo database will have (either `1`, `2` or `3`). For example: `make mongo n=2` will set up Mongo database with 2 shards.
+1. Run `sudo make mongo n=SHARDS_NUMBER` command to create MongoDB's VMs on GCP, with `n` equal to the number of shards the Mongo database will have (either `1`, `2` or `3`). For example: `sudo make mongo n=2` will set up Mongo database with 2 shards. (When Terraform prints an error and the deployment did not succeed, try again, until Terraform says it is ok.)
 2. Wait until the VMs are ready.
 
 ### 3. Running the benchmark
 
 Before running the benchmark, make sure that all Mongo's VMs are ready to be used and connected to.
 
-1. Run the `make benchmark` command to create a Benchmarking Client VM on GCP.
+1. Run the `sudo make benchmark` command to create a Benchmarking Client VM on GCP.
 2. After VM is ready, the benchmark will start immediately.
 3. Wait until the end of the benchmark (the progress can be seen in the terminal).
 
 ### 4. Collecting results, cleanup, and analysis
 
 1. The results file should be located in the root directory of this repository. (named: `Results_[TIME].txt`).
-2. Run `make clean` to destroy all VMs on GCP.
+2. Run `sudo make clean` to destroy all VMs on GCP.
 3. To analyze the results, one can use the Jupyter Notebooks located in the `data_analysis` folder.

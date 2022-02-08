@@ -4,8 +4,6 @@ from math import ceil
 import math, random
 from csv import DictReader
 
-from numpy import delete
-
 DATASET_PATH = "workload_generation/cities_above_1000.csv"
 # Radius variables
 SMALLEST_POPULATION = 1000

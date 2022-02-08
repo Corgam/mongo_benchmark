@@ -18,7 +18,11 @@ benchmark:
 	python3 collect_results.py
 
 clean:
+	cd deployments/benchmarking_client && terraform init
 	cd deployments/benchmarking_client && terraform destroy -auto-approve
+	cd deployments/1Shards && terraform init
 	cd deployments/1Shards && terraform destroy -auto-approve
+	cd deployments/2Shards && terraform init
 	cd deployments/2Shards && terraform destroy -auto-approve
+	cd deployments/3Shards && terraform init
 	cd deployments/3Shards && terraform destroy -auto-approve

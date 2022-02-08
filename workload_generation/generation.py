@@ -4,6 +4,8 @@ from math import ceil
 import math, random
 from csv import DictReader
 
+from numpy import delete
+
 DATASET_PATH = "workload_generation/cities_above_1000.csv"
 # Radius variables
 SMALLEST_POPULATION = 1000
@@ -105,8 +107,11 @@ with open(DATASET_PATH,"r",encoding="utf-8") as dataset:
 # Save the workload file
 print("Started compressing the data...")
 restaurants_json = json.dumps(restaurants_data)
+restaurants_data = None
 encoded = restaurants_json.encode("utf-8")
+restaurants_json = None
 compressed = gzip.compress(encoded)
+encoded = None
 print("Started writing data to a file...")
 with gzip.open("workload_generation/workload.json.gz", "wb") as f:
     f.write(compressed)

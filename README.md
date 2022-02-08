@@ -29,7 +29,7 @@ The plots based on the results can be also seen in the `figures` folder.
 
 1. Log into your GCP account and create a new project called `mongodb-benchmark`. Use this project for further instructions.
 2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-4 VM with default Ubuntu 20.04 LTS, no guarantees are given for other types of VMs (some might have problem with the lack of resources to generate the workload) or the OS)
-3. Download all necessary packages: `sudo apt-get install git make pip3`. 
+3. Download all necessary packages: run `sudo apt-get update` and then `sudo apt-get install git make python3-pip`. 
 4. Clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
 5. Create the GCP's JSON credentials file (Follow: https://cloud.google.com/iam/docs/creating-managing-service-account-keys) and save it as `credentials.json` in the root folder of the repository. (where this `README.md` and `Makefile` are)
 6. Inside of the repo's root folder, run the `sudo make setup` to create the required SSH keys, generate the workload and download all necessary Python packages.

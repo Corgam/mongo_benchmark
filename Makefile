@@ -5,7 +5,6 @@ setup:
 	ssh-keygen -f deployments/1Shards/clientkey -P "" -q
 	ssh-keygen -f deployments/2Shards/clientkey -P "" -q
 	ssh-keygen -f deployments/3Shards/clientkey -P "" -q
-	pip3 install -r requirements.txt
 	python3 workload_generation/generation.py
 
 mongo:

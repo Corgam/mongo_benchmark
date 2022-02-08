@@ -28,7 +28,7 @@ The plots based on the results can be also seen in the `figures` folder.
 ### 1. Requirements and setup
 
 1. Log into your GCP account and create a new project called `mongodb-benchmark`. Use this project for further instructions. Additionaly, the account should have a minimum resource quota of total CPUs of 60.
-2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-8 VM with default Ubuntu 20.04 LTS, no guarantees are given for other types of VMs (some might have problem with the lack of resources to generate the workload) or the OS) If the host VM stops generating the workload, it probably requires more RAM, in that case one can simply download an already generated workload: .
+2. Setup a host VM inside the Compute Engine and SSH into it. (Tested with an e2-standard-8 VM with default Ubuntu 20.04 LTS, no guarantees are given for other types of VMs (some might have problem with the lack of resources to generate the workload) or the OS) If the host VM stops generating the workload, it probably requires more RAM, in that case one can simply download an already generated workload: https://tubcloud.tu-berlin.de/s/J4gyCJttfjFPgsW.
 3. Download all necessary packages: run `sudo apt-get update` and then `sudo apt-get install git make`. 
 4. Install terraform for Linux (follow: https://learn.hashicorp.com/tutorials/terraform/install-cli)
 5. Clone this repository (`sudo git clone https://github.com/Corgam/mongo_benchmark`).
